@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ИТД+
 // @namespace    http://tampermonkey.net/
-// @version       v2.20.21
+// @version       v2.20.200
 // @description  BF | test pool 2
 // @author       @VCB / TG: @YETILOV
 // @match        https://xn--d1ah4a.com/*
