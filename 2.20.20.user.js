@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ИТД+
 // @namespace    http://tampermonkey.net/
-// @version       v2.20.20
-// @description  BF | test
+// @version       v2.20.21
+// @description  BF | test pool 2
 // @author       @VCB / TG: @YETILOV
 // @match        https://xn--d1ah4a.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=xn--d1ah4a.com
