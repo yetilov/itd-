@@ -10,8 +10,8 @@
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // @run-at       document-idle
-// @updateURL    https://github.com/yetilov/itd-/raw/refs/heads/main/2.20.200.user.js
-// @downloadURL  https://github.com/yetilov/itd-/raw/refs/heads/main/2.20.200.user.js
+// @updateURL    https://github.com/yetilov/itd-/raw/refs/heads/main/itd_plus.user.js
+// @downloadURL  https://github.com/yetilov/itd-/raw/refs/heads/main/itd_plus.user.js
 // ==/UserScript==
 (function() {
     'use strict';
