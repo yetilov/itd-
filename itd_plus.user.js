@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         ИТД+
 // @namespace    http://tampermonkey.net/
-// @version       v2.20.200
-// @description  BF | test pool 2
-// @author       @VCB / TG: @YETILOV
+// @version       v2.27
+// @description  не придумал
+// @author       ITD: @vcb / TG: @vcb_code
 // @match        https://xn--d1ah4a.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=xn--d1ah4a.com
 // @grant        GM_getValue
@@ -17,7 +17,9 @@
     'use strict';
     const CONFIG = {
         CHECK_INTERVAL: 2000,
-        NOTIFICATION_DURATION: 5000
+        NOTIFICATION_DURATION: 5000,
+        AD_SHOW_INTERVAL: 180000,
+        AD_DURATION: 5000
     };
     const defaultSettings = {
         enabled: true,
@@ -45,6 +47,11 @@
     let emojiPickerElement = null;
     let emojiPickerHideTimer = null;
     let emojiPickerCurrentButton = null;
+    let adClosed = GM_getValue('itd_ad_closed', false);
+    let adInterval = null;
+    let adHideTimer = null;
+    let adBlockElement = null;
+
     function loadSettings() {
         try {
             const saved = GM_getValue('itd_fixed_settings');
@@ -692,6 +699,136 @@
             if (!isSettingsButtonAdded) addSettingsButton();
         }, CONFIG.CHECK_INTERVAL);
     }
+
+    // --- Ad Block Functions (sidebar version) ---
+    function createSidebarAdBlock() {
+        if (adBlockElement && adBlockElement.isConnected) return adBlockElement;
+        const colors = getCurrentColorScheme();
+        const div = document.createElement('div');
+        div.id = 'itd-ad-block';
+        div.style.cssText = `
+            width: 100%;
+            background: rgba(20, 20, 25, 0.95);
+            border: 2px solid ${colors.primary};
+            border-radius: 24px;
+            padding: 18px 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            backdrop-filter: blur(12px);
+            font-family: Inter, sans-serif;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 10px 0;
+            box-sizing: border-box;
+            transition: opacity 0.2s ease;
+        `;
+        const header = document.createElement('div');
+        header.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 700;
+            font-size: 18px;
+            color: ${colors.primary};
+            border-bottom: 1px solid ${colors.secondary}80;
+            padding-bottom: 8px;
+        `;
+        header.innerHTML = `<span>📢 Телеграм канал автора</span>
+            <button id="itd-ad-close" style="background:none;border:none;color:${colors.primary};font-size:20px;cursor:pointer;padding:0 5px;" title="Закрыть">✕</button>`;
+        const content = document.createElement('div');
+        content.style.cssText = `
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(0,0,0,0.3);
+            border-radius: 30px;
+            padding: 10px 16px;
+            border: 1px solid ${colors.secondary}60;
+        `;
+        const link = document.createElement('a');
+        link.href = 'https://t.me/vcb_code';
+        link.target = '_blank';
+        link.style.cssText = `
+            color: ${colors.light};
+            font-size: 16px;
+            font-weight: 500;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        `;
+        link.innerHTML = `@vcb_code <img src="https://img.icons8.com/color/48/telegram-app.png" width="20" height="20" style="margin-left:4px;">`;
+        content.appendChild(link);
+        const footer = document.createElement('div');
+        footer.style.cssText = `
+            font-size: 11px;
+            color: rgba(255,255,255,0.5);
+            text-align: right;
+            margin-top: 4px;
+        `;
+        footer.textContent = 'Реклама';
+        div.appendChild(header);
+        div.appendChild(content);
+        div.appendChild(footer);
+        div.querySelector('#itd-ad-close').addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeAdBlock();
+        });
+        return div;
+    }
+
+    function insertAdBlock() {
+        if (adClosed) return;
+        const sidebar = document.querySelector('.sidebar-desktop.svelte-13vg9xt');
+        if (!sidebar) return;
+        if (adBlockElement && adBlockElement.isConnected) return; // уже есть
+        const avatarWrapper = sidebar.querySelector('.sidebar-avatar-wrapper');
+        if (!avatarWrapper) return;
+        const newAd = createSidebarAdBlock();
+        sidebar.insertBefore(newAd, avatarWrapper);
+        adBlockElement = newAd;
+        adBlockElement.style.display = 'flex';
+    }
+
+    function removeAdBlock() {
+        if (adBlockElement && adBlockElement.isConnected) {
+            adBlockElement.remove();
+        }
+        adBlockElement = null;
+    }
+
+    function showAdBlock() {
+        if (adClosed) return;
+        insertAdBlock();
+        if (adHideTimer) clearTimeout(adHideTimer);
+        adHideTimer = setTimeout(() => {
+            if (adBlockElement && !adClosed) {
+                adBlockElement.style.display = 'none';
+            }
+        }, CONFIG.AD_DURATION);
+    }
+
+    function closeAdBlock() {
+        adClosed = true;
+        GM_setValue('itd_ad_closed', true);
+        removeAdBlock();
+        if (adInterval) {
+            clearInterval(adInterval);
+            adInterval = null;
+        }
+        if (adHideTimer) {
+            clearTimeout(adHideTimer);
+            adHideTimer = null;
+        }
+    }
+
+    function initAdBlock() {
+        if (adClosed) return;
+        setTimeout(showAdBlock, 1000);
+        adInterval = setInterval(showAdBlock, CONFIG.AD_SHOW_INTERVAL);
+    }
+
     function init() {
         applyAllStyles();
         setTimeout(addSettingsButton, 800);
@@ -707,7 +844,15 @@
                 applyAllStyles();
                 showNotification('Сброшено');
             });
+            GM_registerMenuCommand('🔁 Сбросить рекламу (показать снова)', () => {
+                GM_setValue('itd_ad_closed', false);
+                adClosed = false;
+                if (adInterval) clearInterval(adInterval);
+                initAdBlock();
+                showNotification('Реклама будет показываться');
+            });
         }
+        initAdBlock();
     }
 
     init();
