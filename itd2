@@ -1,444 +1,120 @@
 // ==UserScript==
-// @name         ИТД+ модифицированный
+// @name         ИТД+
 // @namespace    http://tampermonkey.net/
-// @version      v2.21.0
+// @version      v2.201
+// @description  BF | glass rain edition
+// @author       @VCB / TG: @YETILOV
 // @match        https://xn--d1ah4a.com/*
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=xn--d1ah4a.com
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_registerMenuCommand
 // @run-at       document-idle
+// @updateURL    https://github.com/yetilov/itd-/raw/refs/heads/main/2.201.user.js
+// @downloadURL  https://github.com/yetilov/itd-/raw/refs/heads/main/2.201.user.js
 // ==/UserScript==
-(function(){
-'use strict';
-const cfgKey = 'itd_plus_cfg_v2';
-const defaultCfg = {
-  navStyle: 'rect_no_desc',
-  postSort: 'date',
-  accounts: [],
-  activeAccount: null,
-  customBackground: null,
-  accentFromBg: null,
-  colorScheme: 'purple',
-  customColor: '#bc50d4',
-  emojiEnabled: true
-};
-function loadCfg(){try{const v=GM_getValue(cfgKey);return v?JSON.parse(v):Object.assign({},defaultCfg);}catch(e){return Object.assign({},defaultCfg);} }
-function saveCfg(c){GM_setValue(cfgKey,JSON.stringify(c));}
-let CFG = loadCfg();
-function injectCSS(){
-  const colors = {
-    primary: CFG.customColor || '#bc50d4'
-  };
-  const css = `
-:root{--itd-primary:${colors.primary};--itd-primary-rgb:${hexToRgb(colors.primary)};--itd-secondary:rgba(255,255,255,0.06);--itd-accent:${colors.primary};--color-background:#080808;--color-card:#0b0b0b}
-[data-theme=light] { --color-background: #080808 !important; --color-card: #0b0b0b !important; --color-text: #e6e6e6 !important; }
-html,body{height:100% !important;background-color:var(--color-background) !important}
-body::before{content:"";position:fixed;inset:0;z-index:0;background-size:cover;background-position:center;background-repeat:no-repeat;opacity:1;pointer-events:none}
-.itd-rain-canvas{position:fixed;inset:0;z-index:1;pointer-events:none}
-.itd-glass{position:relative;z-index:5 !important;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)) !important;border:1px solid rgba(var(--itd-primary-rgb),0.08) !important;border-radius:16px !important;backdrop-filter:blur(14px) saturate(140%) contrast(1.02) !important;-webkit-backdrop-filter:blur(14px);box-shadow:0 6px 30px rgba(0,0,0,0.6) !important;color:var(--color-text) !important}
-.itd-glass::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.0)) ;mix-blend-mode:overlay}
-.itd-glass.no-rain-mask::before{content:"";position:absolute;inset:0;border-radius:inherit;background:rgba(8,8,8,0.04);pointer-events:none}
-.feed-card, .profile-card, .explore-card, .wall-post-form, .user-card, .suggestions__track, .suggestions__scroll, .profile-banner, .profile-avatar, .create-post{background:transparent !important;border:none !important}
-.sidebar-mobile, .sidebar-pill, .sidebar-nav-item{background:rgba(12,12,12,0.48) !important;backdrop-filter:blur(14px) !important;border-radius:9999px !important;border:1px solid rgba(var(--itd-primary-rgb),0.08) !important}
-.vertical-nav-itd{position:fixed;left:12px;bottom:12px;z-index:60;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:28px;padding:10px;border:1px solid rgba(var(--itd-primary-rgb),0.08);display:flex;flex-direction:column;gap:8px;height:64px;align-items:center;justify-content:center;min-width:64px}
-.vertical-nav-itd.expanded{height:calc(100vh - 120px);border-radius:28px}
-.settings-modal-itd{position:fixed;z-index:1000010;left:50%;top:50%;transform:translate(-50%,-50%);min-width:320px;max-width:920px;padding:18px;border-radius:20px;background:linear-gradient(180deg, rgba(var(--itd-primary-rgb),0.08), rgba(10,10,10,0.35));border:1px solid rgba(var(--itd-primary-rgb),0.15);backdrop-filter:blur(18px);color:var(--color-text)}
-.itd-notification{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:1000020;padding:12px 20px;border-radius:999px;box-shadow:0 8px 30px rgba(0,0,0,0.5);font-weight:600}
-.profile-edit-btn{z-index:1000025 !important;position:relative !important}
-.avatar-replace-itd{border-radius:9999px;object-fit:cover}
-.itd-hide-footer-item{display:none !important}
-.itd-banner-input{display:none}
-`;
-  const style = document.createElement('style');
-  style.id = 'itd-glass-styles';
-  style.innerHTML = css;
-  document.head.appendChild(style);
-  applyGlassToExisting();
-  removeWhiteThemeVariables();
-}
-function hexToRgb(hex){hex=hex.replace('#','');if(hex.length===3)hex=hex.split('').map(c=>c+c).join('');const r=parseInt(hex.substring(0,2),16);const g=parseInt(hex.substring(2,4),16);const b=parseInt(hex.substring(4,6),16);return `${r}, ${g}, ${b}`}
-function applyGlassToExisting(){
-  const selectors = ['.feed-card','.profile-card','.explore-card','.wall-post-form','.user-card','.suggestions__track','.profile-banner__gradient','.profile-avatar','.create-post','.suggestions__track .user-card','.profile-info','.profile-banner'];
-  selectors.forEach(s=>{
-    document.querySelectorAll(s).forEach(el=>{
-      if(!el.classList.contains('itd-glass')) el.classList.add('itd-glass','no-rain-mask');
-    });
-  });
-  document.querySelectorAll('img.profile-avatar, img.avatar, .profile-avatar img').forEach(img=>{
-    img.classList.add('avatar-replace-itd');
-    replaceIconWithAvatar(img);
-  });
-}
-function removeWhiteThemeVariables(){
-  const styleSheets = [...document.styleSheets];
-  styleSheets.forEach(ss=>{
-    try{
-      const rules = ss.cssRules||ss.rules;
-      if(!rules) return;
-      for(let i=rules.length-1;i>=0;i--){
-        const r=rules[i];
-        if(r.cssText && /:root\s*\{[^}]*--color-background: #fff/i.test(r.cssText)){
-          try{ss.deleteRule(i);}catch(e){}
-        }
-      }
-    }catch(e){}
-  });
-}
-function addRainCanvas(){
-  if(document.querySelector('.itd-rain-canvas')) return;
-  const canvas = document.createElement('canvas');
-  canvas.className = 'itd-rain-canvas';
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  document.body.appendChild(canvas);
-  const ctx = canvas.getContext('2d');
-  const drops = [];
-  const dropCount = Math.floor(window.innerWidth/15);
-  for(let i=0;i<dropCount;i++){
-    drops.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,vy:4+Math.random()*10,len:10+Math.random()*40,opacity:0.2+Math.random()*0.6});
-  }
-  function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
-  window.addEventListener('resize',resize);
-  function draw(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.globalCompositeOperation = 'source-over';
-    drops.forEach(d=>{
-      ctx.beginPath();
-      ctx.strokeStyle = `rgba(200,220,255,${d.opacity})`;
-      ctx.lineWidth = 1;
-      ctx.moveTo(d.x, d.y);
-      ctx.lineTo(d.x + d.vy*0.2, d.y + d.len);
-      ctx.stroke();
-      d.x += d.vy*0.6;
-      d.y += d.vy;
-      if(d.y>canvas.height+50 || d.x>canvas.width+50){
-        d.x = Math.random()*canvas.width*0.5;
-        d.y = -20 - Math.random()*200;
-        d.vy = 4+Math.random()*10;
-        d.len = 10+Math.random()*40;
-      }
-    });
-    requestAnimationFrame(draw);
-  }
-  draw();
-}
-function removeSpecificSVG(){
-  document.querySelectorAll('svg').forEach(svg=>{
-    try{
-      if(svg.outerHTML.includes('M12 3V0h12v3h-4v11h-4V3z') && svg.outerHTML.length<3000) svg.remove();
-    }catch(e){}
-  });
-}
-function replaceIconWithAvatar(imgEl){
-  try{
-    const parent = imgEl.closest('.profile-avatar, .avatar-wrapper, .profile-avatar-wrapper') || imgEl.parentElement;
-    if(!parent) return;
-    const userImg = imgEl.cloneNode();
-    userImg.classList.add('avatar-replace-itd');
-    userImg.style.width = imgEl.width?imgEl.width+'px':'48px';
-    userImg.style.height = imgEl.height?imgEl.height+'px':'48px';
-    parent.querySelectorAll('svg, .no-avatar').forEach(n=>n.remove());
-    parent.prepend(userImg);
-  }catch(e){}
-}
-function removeFooterItems(){
-  const texts = ['Условия использования','Конфиденциальность','Cookies','© 2026'];
-  document.querySelectorAll('footer, .footer, .site-footer').forEach(f=>{
-    texts.forEach(t=>{
-      const el = Array.from(f.querySelectorAll('*')).find(x=>x.textContent && x.textContent.trim().includes(t));
-      if(el) el.classList.add('itd-hide-footer-item');
-    });
-  });
-}
-function ensureNotificationsCenter(){
-  const css = document.createElement('style');
-  css.id = 'itd-notify-center';
-  css.innerHTML = `.itd-notification{left:50% !important;transform:translateX(-50%) !important;top:20px !important}`;
-  document.head.appendChild(css);
-}
-function addSettingsButton(){
-  if(document.getElementById('itd-settings-button')) return;
-  const btn = document.createElement('button');
-  btn.id = 'itd-settings-button';
-  btn.textContent = 'НАСТРОЙКИ ИТД';
-  btn.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:1000030;padding:8px 12px;border-radius:12px;background:var(--itd-primary);color:#000;font-weight:800;border:none;cursor:pointer';
-  btn.addEventListener('click',openSettingsModal);
-  document.body.appendChild(btn);
-}
-function openSettingsModal(){
-  closeSettingsModal();
-  const modal = document.createElement('div');
-  modal.className = 'settings-modal-itd';
-  modal.id = 'itd-settings-modal';
-  modal.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div style="font-weight:800;font-size:18px">Настройки ИТД+</div>
-      <div style="display:flex;gap:8px">
-        <button id="itd-save-btn" style="padding:6px 12px;border-radius:12px;background:var(--itd-primary);border:none;color:#000;font-weight:700">Сохранить</button>
-        <button id="itd-close-btn" style="padding:6px 12px;border-radius:12px;background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--color-text)">Закрыть</button>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 320px;gap:12px">
-      <div>
-        <div style="margin-bottom:10px">
-          <label style="font-weight:700">Меню-навигация</label>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button data-nav="rect_no_desc" class="itd-nav-btn">Прямоугольное без описания</button>
-            <button data-nav="rect_with_desc" class="itd-nav-btn">Прямоугольное с описанием</button>
-            <button data-nav="vertical_bottom" class="itd-nav-btn">Вертикальное снизу с описанием</button>
-          </div>
+(function() {
+    'use strict';
+    const CONFIG = {CHECK_INTERVAL:2000,NOTIFICATION_DURATION:5000};
+    const defaultSettings = {enabled:true,emojiEnabled:true,colorScheme:'purple',customColor:'#bc50d4',navStyle:'rect-no-desc',rainEnabled:true,customBg:null,accentFromBg:false,postSort:'date'};
+    const colorSchemes = {purple:{name:'Фиолетовая (стандартная)',primary:'#bc50d4',secondary:'#9c27b0',accent:'#b450d4',light:'#d47de8',dark:'#8a2be2'},blue:{name:'Синяя',primary:'#4285f4',secondary:'#1a73e8',accent:'#5c9bf2',light:'#8ab4f8',dark:'#0d47a1'},green:{name:'Зелёная',primary:'#34a853',secondary:'#2e7d32',accent:'#4caf50',light:'#81c784',dark:'#1b5e20'},red:{name:'Красная',primary:'#ea4335',secondary:'#d32f2f',accent:'#f44336',light:'#ef9a9a',dark:'#b71c1c'},orange:{name:'Оранжевая',primary:'#f57c00',secondary:'#ef6c00',accent:'#ff9800',light:'#ffb74d',dark:'#e65100'},teal:{name:'Бирюзовая',primary:'#009688',secondary:'#00796b',accent:'#4db6ac',light:'#80cbc4',dark:'#004d40'}};
+    let settings = loadSettings();
+    let isSettingsButtonAdded = false;
+    let currentModal = null;
+    let expandedDescriptions = {enabled:false,emoji:false,colors:false};
+    let emojiObserver = null;
+    let bannerButtonObserver = null;
+    let emojiPickerActive = false;
+    let activeEmojiField = null;
+    let processEmojiDOM = null;
+    let emojiPickerElement = null;
+    let emojiPickerHideTimer = null;
+    let emojiPickerCurrentButton = null;
+    let rainCanvas = null;
+    let rainCtx = null;
+    let rainDrops = [];
+    function loadSettings(){try{const saved=GM_getValue('itd_fixed_settings');return saved?JSON.parse(saved):{...defaultSettings}}catch(e){return{...defaultSettings}}}
+    function saveSettings(){GM_setValue('itd_fixed_settings',JSON.stringify(settings))}
+    function hexToRgb(hex){hex=hex.replace('#','');if(hex.length===3)hex=hex.split('').map(c=>c+c).join('');const r=parseInt(hex.substring(0,2),16);const g=parseInt(hex.substring(2,4),16);const b=parseInt(hex.substring(4,6),16);return`${r}, ${g}, ${b}`}
+    function getCurrentColorScheme(){if(settings.colorScheme==='custom'&&settings.customColor){const color=settings.customColor;const rgb=hexToRgb(color);return{name:'Пользовательская',primary:color,secondary:color,accent:color,light:color,dark:color,primaryRgb:rgb,secondaryRgb:rgb,accentRgb:rgb,lightRgb:rgb,darkRgb:rgb}}const scheme=colorSchemes[settings.colorScheme]||colorSchemes.purple;return{...scheme,primaryRgb:hexToRgb(scheme.primary),secondaryRgb:hexToRgb(scheme.secondary),accentRgb:hexToRgb(scheme.accent),lightRgb:hexToRgb(scheme.light),darkRgb:hexToRgb(scheme.dark)}}
+    function applyAllStyles(){const colors=getCurrentColorScheme();let css=`
+        :root{--itd-primary:${colors.primary};--itd-secondary:${colors.secondary};--itd-accent:${colors.accent};--itd-light:${colors.light};--itd-dark:${colors.dark};--itd-primary-rgb:${colors.primaryRgb};--itd-secondary-rgb:${colors.secondaryRgb};--itd-accent-rgb:${colors.accentRgb};--itd-light-rgb:${colors.lightRgb};--itd-dark-rgb:${colors.darkRgb};}
+        body{background-color:rgb(4 4 4)!important;background-image:url('${settings.customBg||''}')!important;background-size:cover!important;background-position:center!important;background-attachment:fixed!important;}
+        .layout::before{content:'';position:fixed;inset:0;background:radial-gradient(circle at center,rgba(255,255,255,0.03),transparent 70%)!important;pointer-events:none;z-index:-1;}
+        .snowfall{display:none!important;}
+        .sidebar-pill{border:1px solid rgba(var(--itd-primary-rgb),0.3)!important;background:rgba(255,255,255,0.05)!important;backdrop-filter:blur(30px)!important;-webkit-backdrop-filter:blur(30px)!important;border-radius:9999px!important;box-shadow:0 8px 32px rgba(0,0,0,0.4)!important;}
+        .sidebar-nav-item{background:rgba(255,255,255,0.08)!important;border:1px solid rgba(255,255,255,0.1)!important;transition:all .3s cubic-bezier(0.4,0,0.2,1)!important;}
+        .sidebar-nav-item:hover{transform:scale(1.05)!important;}
+        .sidebar-nav-item.active{background:var(--itd-primary)!important;box-shadow:0 0 0 3px rgba(var(--itd-primary-rgb),0.3)!important;}
+        .create-post,.feed-card,.post-container,.notifications-card,.profile-card,.right-sidebar__footer,.explore-card,.post-modal{border:1px solid rgba(255,255,255,0.15)!important;background:rgba(255,255,255,0.08)!important;backdrop-filter:blur(40px)!important;-webkit-backdrop-filter:blur(40px)!important;border-radius:32px!important;box-shadow:0 20px 60px rgba(0,0,0,0.5)!important;overflow:hidden!important;}
+        .create-post__inner,.wall-post-form__inner{padding:1.5rem!important;}
+        .post-header,.notifications-header,.profile-info{padding:1.5rem 1.5rem 0.5rem!important;}
+        .toast-container{top:20px!important;left:50%!important;transform:translateX(-50%)!important;}
+        .itd-notification{top:20px!important;left:50%!important;transform:translateX(-50%)!important;background:${isError?'rgba(220,53,69,0.95)':`rgba(${colors.primaryRgb},0.95)`};color:white;padding:14px 28px;border-radius:40px;font-weight:600;z-index:1000000;animation:slideDown 0.3s ease;box-shadow:0 15px 35px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.3);backdrop-filter:blur(20px);};
+        .settings-modal{background:rgba(255,255,255,0.1)!important;border:1px solid var(--itd-accent)!important;backdrop-filter:blur(30px)!important;box-shadow:0 25px 50px rgba(0,0,0,0.6)!important;}
+        .profile-edit-btn,.profile-follow-btn,.create-post__submit,.wall-post-form__submit{background:var(--itd-primary)!important;color:#000!important;font-weight:800!important;border-radius:9999px!important;transition:all .2s!important;}
+        .profile-edit-btn:hover,.profile-follow-btn:hover,.create-post__submit:hover,.wall-post-form__submit:hover{transform:scale(1.03)!important;box-shadow:0 0 0 4px rgba(var(--itd-primary-rgb),0.4)!important;}
+        .right-sidebar__links,.right-sidebar__copyright{display:none!important;}
+        .mobile-nav-item{background:rgba(255,255,255,0.1)!important;border-radius:9999px!important;}
+        .avatar{border:2px solid rgba(255,255,255,0.3)!important;box-shadow:0 4px 12px rgba(0,0,0,0.3)!important;}
+        .feed-tab.active{border-bottom:3px solid var(--itd-primary)!important;}
+        .post-action.like.liked{color:var(--itd-primary)!important;}
+        .sidebar-logo svg{display:none!important;}
+        .sidebar-logo::after{content:'ИТД';font-size:28px;font-weight:900;color:var(--itd-light);letter-spacing:-1px;}
+    `;if(settings.navStyle==='rect-no-desc'){css+=`.sidebar-pill{flex-direction:row!important;gap:1rem!important;padding:0.8rem 1.5rem!important;}.sidebar-nav{flex-direction:row!important;gap:1.2rem!important;}`}else if(settings.navStyle==='rect-desc'){css+=`.sidebar-pill{flex-direction:row!important;gap:0.8rem!important;padding:1rem!important;}.sidebar-nav-item{display:flex!important;align-items:center!important;gap:0.6rem!important;padding:0.7rem 1.2rem!important;}.sidebar-nav-item span{display:block!important;font-size:13px!important;opacity:0.8!important;}`}else if(settings.navStyle==='vertical-desc'){css+=`.sidebar-pill{flex-direction:column!important;gap:0.4rem!important;padding:1.2rem 0.8rem!important;height:100%!important;border-radius:40px!important;}.sidebar-nav{flex-direction:column!important;gap:1.2rem!important;}.sidebar-nav-item{display:flex!important;flex-direction:column!important;align-items:center!important;gap:0.3rem!important;padding:0.8rem 0!important;width:100%!important;}.sidebar-nav-item span{font-size:11px!important;}`}
+    if(settings.rainEnabled){css+=`.rain-container{position:fixed;inset:0;pointer-events:none;z-index:-2;overflow:hidden;}`;createRain();}
+    const style=document.createElement('style');style.id='itd-glass-styles';style.textContent=css;document.head.appendChild(style);if(settings.customBg&&settings.accentFromBg){extractAccentFromBg(settings.customBg)}}
+    function createRain(){if(rainCanvas)return;rainCanvas=document.createElement('canvas');rainCanvas.className='rain-container';rainCanvas.width=window.innerWidth;rainCanvas.height=window.innerHeight;document.body.appendChild(rainCanvas);rainCtx=rainCanvas.getContext('2d');rainDrops=[];for(let i=0;i<200;i++){rainDrops.push({x:Math.random()*rainCanvas.width,y:Math.random()*rainCanvas.height,length:Math.random()*20+10,speed:Math.random()*15+10,opacity:Math.random()*0.6+0.4})}}function animateRain(){if(!rainCtx)return;rainCtx.clearRect(0,0,rainCanvas.width,rainCanvas.height);rainCtx.strokeStyle='rgba(180,200,255,0.4)';rainCtx.lineWidth=1.5;for(let drop of rainDrops){rainCtx.beginPath();rainCtx.moveTo(drop.x,drop.y);rainCtx.lineTo(drop.x+drop.length*0.3,drop.y+drop.length);rainCtx.stroke();drop.y+=drop.speed;if(drop.y>rainCanvas.height){drop.y=-20;drop.x=Math.random()*rainCanvas.width}}requestAnimationFrame(animateRain)}function resizeRain(){if(rainCanvas){rainCanvas.width=window.innerWidth;rainCanvas.height=window.innerHeight}}window.addEventListener('resize',resizeRain);setTimeout(()=>{if(settings.rainEnabled){animateRain()}},500)
+    function addSettingsButton(){if(isSettingsButtonAdded)return;const nav=document.querySelector('.sidebar-nav');if(!nav)return;const settingsItem=document.createElement('a');settingsItem.className='sidebar-nav-item';settingsItem.innerHTML=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" width="24" height="24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 002.573-1.066c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 00.817 1.194 1.724 1.724 0 01.817 1.194c-.94 1.543.827 3.31 2.37 2.37 1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 01-2.573 1.066 1.724 1.724 0 01-.817 1.194c-.94 1.543.827 3.31 2.37 2.37a1.724 1.724 0 01.817 1.194c.94 1.543-.827 3.31-2.37 2.37-1.756.426-1.756 2.924 0 3.35a1.724 1.724 0 01-2.573 1.066 1.724 1.724 0 01-.817 1.194c-.94 1.543.827 3.31 2.37 2.37 1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 01-2.573 1.066 1.724 1.724 0 01-.817 1.194c-.94 1.543.827 3.31 2.37 2.37z"/><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span>Настройки</span>`;settingsItem.href='#';settingsItem.addEventListener('click',e=>{e.preventDefault();openSettingsModal()});nav.appendChild(settingsItem);isSettingsButtonAdded=true}
+    function openSettingsModal(){if(currentModal)currentModal.remove();const colors=getCurrentColorScheme();currentModal=document.createElement('div');currentModal.className='settings-modal';currentModal.style.cssText=`position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(20px);`;const content=document.createElement('div');content.style.cssText=`background:rgba(255,255,255,0.1);border:1px solid ${colors.accent};border-radius:32px;width:520px;max-height:90vh;overflow-y:auto;padding:2rem;box-shadow:0 30px 80px rgba(0,0,0,0.7);backdrop-filter:blur(40px);`;content.innerHTML=`
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;">
+            <h2 style="font-size:1.8rem;font-weight:800;color:var(--itd-light);">Настройки ИТД+</h2>
+            <button onclick="this.closest('.settings-modal').remove()" style="background:none;border:none;color:${colors.accent};font-size:28px;cursor:pointer;">✕</button>
         </div>
-        <div style="margin-bottom:10px">
-          <label style="font-weight:700">Сортировка постов</label>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button data-sort="likes" class="itd-sort-btn">По лайкам</button>
-            <button data-sort="comments" class="itd-sort-btn">По комментариям</button>
-            <button data-sort="date" class="itd-sort-btn">По дате (стандарт)</button>
-          </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+            <div>
+                <label style="display:block;font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:0.5rem;">Цветовая схема</label>
+                <select id="color-select" style="width:100%;padding:0.8rem;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:16px;color:white;font-size:15px;">
+                    ${Object.keys(colorSchemes).map(k=>`<option value="${k}" ${settings.colorScheme===k?'selected':''}>${colorSchemes[k].name}</option>`).join('')}
+                    <option value="custom" ${settings.colorScheme==='custom'?'selected':''}>Пользовательская</option>
+                </select>
+            </div>
+            <div>
+                <label style="display:block;font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:0.5rem;">Стиль меню</label>
+                <select id="nav-style" style="width:100%;padding:0.8rem;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:16px;color:white;font-size:15px;">
+                    <option value="rect-no-desc" ${settings.navStyle==='rect-no-desc'?'selected':''}>Прямоугольное без описания</option>
+                    <option value="rect-desc" ${settings.navStyle==='rect-desc'?'selected':''}>Прямоугольное с описанием</option>
+                    <option value="vertical-desc" ${settings.navStyle==='vertical-desc'?'selected':''}>Вертикальное снизу с описанием</option>
+                </select>
+            </div>
         </div>
-        <div style="margin-bottom:10px">
-          <label style="font-weight:700">Фон страницы</label>
-          <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-            <input id="itd-bg-upload" type="file" accept="image/*">
-            <button id="itd-clear-bg" style="padding:6px 10px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.06)">Сброс</button>
-          </div>
-          <div id="itd-bg-preview" style="margin-top:8px;max-height:160px;overflow:hidden;border-radius:12px"></div>
+        <div style="margin:2rem 0;padding:1.5rem;background:rgba(255,255,255,0.05);border-radius:20px;">
+            <label style="display:block;font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:0.5rem;">Кастомный фон</label>
+            <input type="file" id="bg-upload" accept="image/*" style="width:100%;padding:0.8rem;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:16px;color:white;">
+            <div style="margin-top:1rem;display:flex;align-items:center;gap:1rem;">
+                <label style="flex:1;"><input type="checkbox" id="accent-from-bg" ${settings.accentFromBg?'checked':''}> Акцент из фона</label>
+                <button id="clear-bg" style="padding:0.6rem 1.2rem;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:9999px;color:white;">Очистить</button>
+            </div>
         </div>
-        <div style="margin-bottom:10px">
-          <label style="font-weight:700">Аккаунты</label>
-          <div style="margin-top:8px;display:flex;gap:8px">
-            <input id="itd-account-input" placeholder="Имя аккаунта" style="flex:1;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04)">
-            <button id="itd-add-account" style="padding:6px 10px;border-radius:8px;background:var(--itd-primary);border:none;color:#000">Добавить</button>
-          </div>
-          <div id="itd-accounts-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
+        <div style="margin:2rem 0;">
+            <label style="display:block;font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:0.5rem;">Сортировка постов</label>
+            <select id="post-sort" style="width:100%;padding:0.8rem;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:16px;color:white;font-size:15px;">
+                <option value="date" ${settings.postSort==='date'?'selected':''}>По дате (новые)</option>
+                <option value="likes" ${settings.postSort==='likes'?'selected':''}>По лайкам</option>
+                <option value="comments" ${settings.postSort==='comments'?'selected':''}>По комментариям</option>
+            </select>
         </div>
-        <div style="margin-bottom:10px">
-          <label style="font-weight:700">Баннеры / Загрузки</label>
-          <div style="margin-top:8px">
-            <input id="itd-banner-upload" class="itd-banner-input" type="file" accept="image/*">
-            <button id="itd-banner-btn" style="padding:6px 10px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.06)">Загрузить баннер</button>
-          </div>
+        <div style="display:flex;gap:1rem;margin-top:2rem;">
+            <button id="save-settings" style="flex:1;padding:1rem;background:var(--itd-primary);color:#000;border:none;border-radius:9999px;font-weight:800;font-size:16px;cursor:pointer;">Сохранить</button>
+            <button id="cancel-settings" style="flex:1;padding:1rem;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:9999px;color:white;font-weight:600;cursor:pointer;">Отмена</button>
         </div>
-      </div>
-      <div style="background:rgba(0,0,0,0.18);padding:10px;border-radius:12px">
-        <div style="font-weight:700;margin-bottom:8px">Предпросмотр</div>
-        <div id="itd-preview-area" style="height:320px;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02))">
-          <div style="text-align:center;color:rgba(255,255,255,0.8)">Загрузите фон или измените параметры</div>
-        </div>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  document.getElementById('itd-close-btn').addEventListener('click',closeSettingsModal);
-  document.getElementById('itd-save-btn').addEventListener('click',()=>{
-    saveCfg(CFG);
-    applyNavStyle();
-    sortPosts(CFG.postSort);
-    showNotification('Настройки сохранены');
-    closeSettingsModal();
-  });
-  modal.querySelectorAll('.itd-nav-btn').forEach(b=>{
-    b.addEventListener('click',()=>{
-      document.querySelectorAll('.itd-nav-btn').forEach(x=>x.style.opacity='0.6');
-      b.style.opacity='1';
-      CFG.navStyle = b.getAttribute('data-nav');
-    });
-  });
-  modal.querySelectorAll('.itd-sort-btn').forEach(b=>{
-    b.addEventListener('click',()=>{
-      document.querySelectorAll('.itd-sort-btn').forEach(x=>x.style.opacity='0.6');
-      b.style.opacity='1';
-      CFG.postSort = b.getAttribute('data-sort');
-      sortPosts(CFG.postSort);
-    });
-  });
-  const bgUpload = document.getElementById('itd-bg-upload');
-  bgUpload.addEventListener('change',e=>{
-    const f = e.target.files[0];
-    if(!f) return;
-    const reader = new FileReader();
-    reader.onload = function(ev){
-      const data = ev.target.result;
-      CFG.customBackground = data;
-      document.body.style.backgroundImage = `url('${data}')`;
-      document.body.style.backgroundSize = 'cover';
-      document.body.style.backgroundPosition = 'center';
-      extractAccentFromImage(data);
-      document.getElementById('itd-bg-preview').innerHTML = `<img src="${data}" style="width:100%;height:auto;display:block">`;
-    };
-    reader.readAsDataURL(f);
-  });
-  document.getElementById('itd-clear-bg').addEventListener('click',()=>{
-    CFG.customBackground = null;
-    document.body.style.backgroundImage = '';
-    document.getElementById('itd-bg-preview').innerHTML = '';
-    showNotification('Фон сброшен');
-  });
-  document.getElementById('itd-add-account').addEventListener('click',()=>{
-    const name = document.getElementById('itd-account-input').value.trim();
-    if(!name) return;
-    CFG.accounts.push(name);
-    if(!CFG.activeAccount) CFG.activeAccount = name;
-    renderAccounts();
-    document.getElementById('itd-account-input').value = '';
-    saveCfg(CFG);
-  });
-  function renderAccounts(){
-    const el = document.getElementById('itd-accounts-list');
-    el.innerHTML = '';
-    CFG.accounts.forEach(a=>{
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.03)';
-      row.innerHTML = `<div style="font-weight:600">${a}${CFG.activeAccount===a?' ✓':''}</div><div style="display:flex;gap:6px"><button data-act="${a}" class="itd-switch-btn" style="padding:4px 8px;border-radius:8px">Выбрать</button><button data-del="${a}" class="itd-del-btn" style="padding:4px 8px;border-radius:8px">Удалить</button></div>`;
-      el.appendChild(row);
-    });
-    el.querySelectorAll('.itd-switch-btn').forEach(b=>b.addEventListener('click',ev=>{
-      CFG.activeAccount = b.getAttribute('data-act');
-      saveCfg(CFG);
-      renderAccounts();
-      showNotification('Сменён аккаунт на '+CFG.activeAccount);
-    }));
-    el.querySelectorAll('.itd-del-btn').forEach(b=>b.addEventListener('click',ev=>{
-      const d = b.getAttribute('data-del');
-      CFG.accounts = CFG.accounts.filter(x=>x!==d);
-      if(CFG.activeAccount===d) CFG.activeAccount = CFG.accounts[0]||null;
-      saveCfg(CFG);
-      renderAccounts();
-    }));
-  }
-  renderAccounts();
-  document.getElementById('itd-banner-btn').addEventListener('click',()=>{
-    const inp = document.getElementById('itd-banner-upload');
-    inp.click();
-    inp.onchange = function(e){
-      const f = e.target.files[0];
-      if(!f) return;
-      const r = new FileReader();
-      r.onload = function(ev){
-        const data = ev.target.result;
-        document.querySelectorAll('.profile-banner__image, .profile-banner__gradient, .profile-banner').forEach(b=>{
-          if(b.tagName==='IMG') b.src = data;
-          else b.style.backgroundImage = `url('${data}')`;
-        });
-        showNotification('Баннеры обновлены');
-      };
-      r.readAsDataURL(f);
-    };
-  });
-}
-function closeSettingsModal(){document.getElementById('itd-settings-modal')?.remove();}
-function showNotification(text, isError=false){
-  document.querySelectorAll('.itd-notification').forEach(n=>n.remove());
-  const div = document.createElement('div');
-  div.className = 'itd-notification';
-  div.style.background = isError? 'rgba(220,53,69,0.95)':'rgba('+hexToRgb(CFG.customColor||'#bc50d4')+',0.95)';
-  div.textContent = text;
-  document.body.appendChild(div);
-  setTimeout(()=>div.remove(),5000);
-}
-function applyNavStyle(){
-  document.querySelectorAll('.itd-custom-nav, .vertical-nav-itd').forEach(n=>n.remove());
-  if(CFG.navStyle==='vertical_bottom'){
-    const v = document.createElement('div');
-    v.className = 'vertical-nav-itd expanded';
-    v.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start;padding:12px"><a href="#" style="display:flex;gap:10px;align-items:center"><img src="" style="width:36px;height:36px;border-radius:8px">Главная<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-left:8px">Описание</div></a><a href="#" style="display:flex;gap:10px;align-items:center"><img src="" style="width:36px;height:36px;border-radius:8px">Сообщения<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-left:8px">Описание</div></a></div>`;
-    document.body.appendChild(v);
-  } else {
-    const h = document.createElement('div');
-    h.className = 'itd-custom-nav';
-    h.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:1000025;display:flex;gap:8px;padding:8px;border-radius:12px';
-    if(CFG.navStyle==='rect_no_desc'){
-      h.innerHTML = `<div style="display:flex;gap:8px;"><button style="padding:8px 12px;border-radius:12px;background:var(--itd-primary);border:none;color:#000">Главная</button><button style="padding:8px 12px;border-radius:12px;background:transparent;border:1px solid rgba(255,255,255,0.04)">Тренды</button></div>`;
-    } else {
-      h.innerHTML = `<div style="display:flex;gap:8px;"><div style="padding:8px 12px;border-radius:12px;background:var(--itd-primary);color:#000">Главная<div style="font-size:12px;color:rgba(0,0,0,0.6)">Посты</div></div><div style="padding:8px 12px;border-radius:12px;background:transparent;border:1px solid rgba(255,255,255,0.04)">Рекомендации<div style="font-size:12px;color:rgba(255,255,255,0.6)">По интересам</div></div></div>`;
-    }
-    document.body.appendChild(h);
-  }
-}
-function sortPosts(mode){
-  CFG.postSort = mode;
-  const feed = document.querySelectorAll('.post-container, .item, .feed-card, [data-post-id]');
-  const parent = document.querySelector('.feed, .feed-list, .posts') || document.querySelector('.content') || document.body;
-  if(!parent) return;
-  const items = Array.from(parent.querySelectorAll('.post-container, .item, .feed-card, [data-post-id]'));
-  if(items.length===0) return;
-  function getNum(el, selector){
-    try{
-      if(selector==='likes') return parseInt(el.getAttribute('data-likes')|| el.querySelector('.likes-count')?.textContent?.replace(/\D/g,'')||0)||0;
-      if(selector==='comments') return parseInt(el.getAttribute('data-comments')|| el.querySelector('.comments-count')?.textContent?.replace(/\D/g,'')||0)||0;
-      if(selector==='date') return new Date(el.getAttribute('data-created')|| el.querySelector('time')?.getAttribute('datetime') || Date.now()).getTime();
-    }catch(e){}
-    return 0;
-  }
-  if(mode==='likes' || mode==='comments'){
-    items.sort((a,b)=> getNum(b,mode)-getNum(a,mode));
-  } else if(mode==='date'){
-    items.sort((a,b)=> getNum(b,'date')-getNum(a,'date'));
-  }
-  items.forEach(i=>parent.appendChild(i));
-}
-function extractAccentFromImage(dataUrl){
-  try{
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = function(){
-      const c = document.createElement('canvas');
-      c.width = 40; c.height = 40;
-      const ctx = c.getContext('2d');
-      ctx.drawImage(img,0,0,40,40);
-      const d = ctx.getImageData(0,0,40,40).data;
-      let r=0,g=0,b=0,len=0;
-      for(let i=0;i<d.length;i+=4){
-        r+=d[i]; g+=d[i+1]; b+=d[i+2]; len++;
-      }
-      r=Math.round(r/len); g=Math.round(g/len); b=Math.round(b/len);
-      const hex = rgbToHex(r,g,b);
-      CFG.accentFromBg = hex;
-      CFG.customColor = hex;
-      saveCfg(CFG);
-      document.documentElement.style.setProperty('--itd-primary',hex);
-      document.documentElement.style.setProperty('--itd-primary-rgb',hexToRgb(hex));
-      showNotification('Акцент темы обновлён');
-    };
-    img.src = dataUrl;
-  }catch(e){}
-}
-function rgbToHex(r,g,b){return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1)}
-function removeAccountSwitchStub(){
-  document.querySelectorAll('[data-itd-account-switch-placeholder],[data-itd-account-switch]').forEach(n=>n.remove());
-}
-function restoreEmojiSupport(){
-  CFG.emojiEnabled = true;
-  saveCfg(CFG);
-  try{document.querySelectorAll('textarea,input,[contenteditable="true"]').forEach(inp=>{inp.setAttribute('data-itd-emoji','1');});}catch(e){}
-}
-function adaptTampermonkeyStyles(){
-  const tmStyle = document.getElementById('itd-glass-styles');
-  if(!tmStyle) return;
-  tmStyle.innerHTML += `
-  .profile-edit-btn{transform:none !important;left:unset !important}
-  `;
-}
-function init(){
-  injectCSS();
-  addRainCanvas();
-  removeSpecificSVG();
-  removeFooterItems();
-  ensureNotificationsCenter();
-  addSettingsButton();
-  applyNavStyle();
-  removeAccountSwitchStub();
-  restoreEmojiSupport();
-  adaptTampermonkeyStyles();
-  setTimeout(()=>{applyGlassToExisting();},800);
-  document.addEventListener('click',function(e){
-    const t = e.target;
-    if(t && t.closest && t.closest('.profile-edit-btn')){
-      const menuBar = document.querySelector('.sidebar-mobile, .sidebar-pill, .topbar, nav');
-      if(menuBar) menuBar.style.zIndex = '1000005';
-      t.style.zIndex = '1000035';
-    }
-  },true);
-  setInterval(()=>{applyGlassToExisting();removeSpecificSVG();},3000);
-}
-init();
+    `;currentModal.appendChild(content);document.body.appendChild(currentModal);document.getElementById('color-select').addEventListener('change',e=>{if(e.target.value==='custom'){const c=prompt('Цвет (hex)',settings.customColor||'#bc50d4');if(c)settings.customColor=c;settings.colorScheme='custom'}else{settings.colorScheme=e.target.value;settings.customColor=null}});document.getElementById('nav-style').addEventListener('change',e=>{settings.navStyle=e.target.value});document.getElementById('bg-upload').addEventListener('change',e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{settings.customBg=e.target.result;applyAllStyles()};reader.readAsDataURL(file)});document.getElementById('accent-from-bg').addEventListener('change',e=>{settings.accentFromBg=e.target.checked;applyAllStyles()});document.getElementById('clear-bg').addEventListener('click',()=>{settings.customBg=null;applyAllStyles()});document.getElementById('post-sort').addEventListener('change',e=>{settings.postSort=e.target.value;applyPostSorting()});document.getElementById('save-settings').addEventListener('click',()=>{saveSettings();applyAllStyles();currentModal.remove();showNotification('Настройки сохранены')});document.getElementById('cancel-settings').addEventListener('click',()=>{currentModal.remove()})}
+    function applyPostSorting(){const tabs=document.querySelectorAll('.feed-tab');if(tabs.length){tabs.forEach((t,i)=>{if(i===0){t.textContent=settings.postSort==='date'?'Новые':settings.postSort==='likes'?'Популярное':'Комменты'}})}}
+    function extractAccentFromBg(base64){const img=new Image();img.src=base64;img.onload=()=>{const canvas=document.createElement('canvas');canvas.width=1;canvas.height=1;const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0,1,1);const [r,g,b]=ctx.getImageData(0,0,1,1).data;const color=`#${((1<<24)+ (r<<16) + (g<<8) + b).toString(16).slice(1)}`;settings.customColor=color;settings.colorScheme='custom';saveSettings();applyAllStyles()}}
+    function initEmojiSystem(){if(!settings.emojiEnabled)return;const style=document.createElement('style');style.id='apple-emoji-styles';style.textContent=`.apple-emoji{font-size:inherit!important;line-height:inherit!important;vertical-align:text-bottom!important;display:inline-block!important;}`;document.head.appendChild(style);const emojiConfig={emojiSource:'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.1.2/img/apple/64',imageFormat:'png'};const emojiCache=new Map();function getEmojiCode(emojiChar){let fullCode='';for(let i=0;i<emojiChar.length;i++){const codePoint=emojiChar.codePointAt(i);if(codePoint){let charCode=codePoint.toString(16).toLowerCase();fullCode+=(fullCode?'-':'')+charCode;if(codePoint>0xFFFF)i++}}return fullCode.replace(/-fe0f/g,'').replace(/fe0f-?/g,'').replace(/-+/g,'-').replace(/^-|-$/g,'')};function getAppleEmojiUrl(emojiCode){return`${emojiConfig.emojiSource}/${emojiCode}.${emojiConfig.imageFormat}`};function createEmojiElement(emojiChar){const emojiCode=getEmojiCode(emojiChar);if(!emojiCode)return document.createTextNode(emojiChar);if(emojiCache.has(emojiChar))return emojiCache.get(emojiChar).cloneNode(true);const container=document.createElement('span');container.className='apple-emoji-container';const img=document.createElement('img');img.src=getAppleEmojiUrl(emojiCode);img.alt=emojiChar;img.className='apple-emoji';img.style.cssText='display:inline-block;vertical-align:text-bottom;font-size:inherit;line-height:inherit;height:1.2em;width:auto;max-width:1.2em;min-width:1em;object-fit:contain;margin:0 0.05em;';container.appendChild(img);emojiCache.set(emojiChar,container.cloneNode(true));return container};processEmojiDOM=function(root=document.body){const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:node=>node.textContent.trim().match(/[\p{Emoji}]/u)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT});let node;while(node=walker.nextNode()){const text=node.textContent;const matches=[...text.matchAll(/[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}](?:\u200D[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}])*/gu)];if(matches.length){const frag=document.createDocumentFragment();let last=0;for(const m of matches){frag.appendChild(document.createTextNode(text.substring(last,m.index)));frag.appendChild(createEmojiElement(m[0]));last=m.index+m[0].length}frag.appendChild(document.createTextNode(text.substring(last)));node.parentNode.replaceChild(frag,node)}}};if(emojiObserver)emojiObserver.disconnect();emojiObserver=new MutationObserver(()=>{processEmojiDOM()});emojiObserver.observe(document.body,{childList:true,subtree:true});setTimeout(()=>processEmojiDOM(),300)}
+    function initBannerUpload(){const btns=document.querySelectorAll('.profile-banner__btn[title="Нарисовать баннер"]');btns.forEach(b=>{if(b.dataset.itdBanner)return;b.dataset.itdBanner='true';const uploadBtn=document.createElement('button');uploadBtn.className='profile-banner__btn';uploadBtn.title='Загрузить баннер';uploadBtn.innerHTML=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>`;uploadBtn.style.marginRight='8px';uploadBtn.addEventListener('click',()=>{const input=document.createElement('input');input.type='file';input.accept='image/*';input.onchange=e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{const img=document.querySelector('.profile-banner__image');if(img)img.src=ev.target.result;showNotification('Баннер обновлен')};reader.readAsDataURL(file)}});b.parentNode.insertBefore(uploadBtn,b)})}
+    function initAvatarReplacement(){const avatars=document.querySelectorAll('.sidebar-avatar .avatar--emoji');avatars.forEach(a=>{if(a.dataset.itdAvatar)return;a.dataset.itdAvatar='true';const userAvatar=document.createElement('div');userAvatar.className='avatar avatar--emoji';userAvatar.style.fontSize='28px';userAvatar.textContent='🤯';a.replaceWith(userAvatar)})}
+    function showNotification(text,isError=false){const colors=getCurrentColorScheme();const n=document.createElement('div');n.className='itd-notification';n.style.cssText=`position:fixed;top:20px;left:50%;transform:translateX(-50%);background:${isError?'rgba(220,53,69,0.95)':`rgba(${colors.primaryRgb},0.95)`};color:white;padding:14px 28px;border-radius:40px;font-weight:600;z-index:1000000;animation:slideDown 0.3s ease;box-shadow:0 15px 35px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.3);backdrop-filter:blur(20px);`;n.innerHTML=`<span style="margin-right:10px;font-size:18px;">${isError?'❌':'✅'}</span>${text}`;document.body.appendChild(n);setTimeout(()=>{n.style.transition='all 0.2s';n.style.opacity='0';n.style.transform='translateX(-50%) translateY(-20px)';setTimeout(()=>n.remove(),200)},CONFIG.NOTIFICATION_DURATION)}
+    function init(){applyAllStyles();addSettingsButton();setInterval(addSettingsButton,CONFIG.CHECK_INTERVAL);initEmojiSystem();initBannerUpload();initAvatarReplacement();if(typeof GM_registerMenuCommand!=='undefined'){GM_registerMenuCommand('⚙️ Настройки',openSettingsModal)}window.addEventListener('load',()=>{setTimeout(()=>{applyPostSorting();resizeRain()},800)})}
+    init();
 })();
