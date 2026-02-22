@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         ИТД+
+// @name         ИТД+ 
 // @namespace    http://tampermonkey.net/
-// @version      v2.4.4
-// @description МИНИ ПЛЕЕР НАХУЙ!
-// @author       ITD: @VCB / TG: @VCB_CODE
+// @version      v2.5.0
+// @description  мини -плеер с автопереключением, всегда виден, можно закрыть. загрузка треков только из плеера.
+// @author       ITD: @VCB / TG: @VCB_CODE (мод.)
 // @match        https://xn--d1ah4a.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=xn--d1ah4a.com
 // @grant        GM_getValue
@@ -17,6 +17,8 @@
 
 (function() {
     'use strict';
+
+    // ==================== ЭМОДЗИ-СИСТЕМА (ПОЛНАЯ, БЕЗ ИЗМЕНЕНИЙ) ====================
     function hideEmojiPickerWithDelay(delay = 300) {
         if (emojiPickerHideTimer) clearTimeout(emojiPickerHideTimer);
         emojiPickerHideTimer = setTimeout(() => {
@@ -85,7 +87,6 @@
         picker.style.top = top + 'px'; picker.style.left = left + 'px';
     }
 
-    // ★ ДОБАВЛЕНИЕ КНОПКИ ЭМОДЗИ В ТЕКСТОВЫЕ ПОЛЯ (из 2.201.js) ★
     function addEmojiPickerButton() {
         if (!settings.emojiEnabled) return;
         ['.create-post', '.wall-post-form'].forEach(selector => {
@@ -145,10 +146,7 @@
         setInterval(addEmojiPickerButton, 2000);
     }
 
-    function startPeriodicCheck() {
-        setInterval(() => { if (!isSettingsButtonAdded) addSettingsButton(); }, CONFIG.CHECK_INTERVAL);
-    }
-
+    // ================== ПОДКЛЮЧЕНИЕ MATERIAL ICONS ==================
     function loadMaterialIcons() {
         if (!document.querySelector('link[href*="material-icons"]')) {
             const link = document.createElement('link');
@@ -159,6 +157,7 @@
     }
     loadMaterialIcons();
 
+    // ================== ПЕРЕХВАТЧИК FETCH ==================
     window.interceptedRequests = window.interceptedRequests || [];
     const originalFetch = window.fetch;
     window.fetch = function(...args) {
@@ -174,6 +173,7 @@
         return originalFetch.apply(this, args);
     };
 
+    // ================== ОСНОВНЫЕ НАСТРОЙКИ ==================
     const CONFIG = {
         CHECK_INTERVAL: 2000,
         NOTIFICATION_DURATION: 5000,
@@ -186,7 +186,8 @@
         colorScheme: 'purple',
         customColor: '#bc50d4',
         shuffle: false,
-        lastTrackId: null
+        lastTrackId: null,
+        playerVisible: true          // добавлено
     };
 
     const colorSchemes = {
@@ -200,27 +201,27 @@
 
     let settings = loadSettings();
     let isSettingsButtonAdded = false;
-    let isMusicButtonAdded = false;
-    let currentModal = null; // модалка настроек
-    let musicModal = null;   // модалка медиатеки
+    let isPlayerToggleButtonAdded = false;   // переименовано
+    let currentModal = null;                  // модалка настроек
     let miniPlayer = null;
-    let trackListPopup = null; // всплывающий список треков
+    let trackListPopup = null;                 // всплывающий список треков
     let expandedDescriptions = { enabled: false, emoji: false, colors: false };
     let adBlockTimerId = null;
     let adBlockLastClosedTime = 0;
-    let commentsObserver = null; // для отслеживания комментариев
+    let commentsObserver = null;
 
+    // ================== ПЕРЕМЕННЫЕ ПЛЕЕРА ==================
     let tracks = [];
     let currentTrackIndex = -1;
-    let isPlaying = false;
-    let db = null;
     let shuffle = settings.shuffle || false;
     const audioElement = document.createElement('audio');
     audioElement.id = 'itd-global-audio';
     audioElement.style.display = 'none';
     document.body.appendChild(audioElement);
+    let db = null;
+    let isPlayerMinimized = false;             // состояние сворачивания
 
-
+    // ================== ЭМОДЗИ-СИСТЕМА (переменные) ==================
     let emojiObserver = null;
     let emojiPickerActive = false;
     let activeEmojiField = null;
@@ -228,46 +229,8 @@
     let emojiPickerElement = null;
     let emojiPickerHideTimer = null;
     let emojiPickerCurrentButton = null;
-    let miniPlayerCollapsed = false; // <-- состояние сворачивания
-function loadSettings() {
-        try {
-            const saved = GM_getValue('itd_fixed_settings');
-            return saved ? JSON.parse(saved) : { ...defaultSettings };
-        } catch (e) {
-            return { ...defaultSettings };
-        }
-    }
 
-    function saveSettings() {
-        GM_setValue('itd_fixed_settings', JSON.stringify(settings));
-    }
-
-    function hexToRgb(hex) {
-        hex = hex.replace('#', '');
-        if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-        return `${r}, ${g}, ${b}`;
-    }
-
-    function getCurrentColorScheme() {
-        if (settings.colorScheme === 'custom' && settings.customColor) {
-            const color = settings.customColor;
-            const rgb = hexToRgb(color);
-            return { name: 'Пользовательская', primary: color, secondary: color, accent: color, light: color, dark: color, primaryRgb: rgb, secondaryRgb: rgb, accentRgb: rgb, lightRgb: rgb, darkRgb: rgb };
-        }
-        const scheme = colorSchemes[settings.colorScheme] || colorSchemes.purple;
-        return { ...scheme, primaryRgb: hexToRgb(scheme.primary), secondaryRgb: hexToRgb(scheme.secondary), accentRgb: hexToRgb(scheme.accent), lightRgb: hexToRgb(scheme.light), darkRgb: hexToRgb(scheme.dark) };
-    }
-
-    function formatTime(sec) {
-        if (!sec || isNaN(sec)) return '0:00';
-        const m = Math.floor(sec / 60);
-        const s = Math.floor(sec % 60);
-        return `${m}:${s.toString().padStart(2, '0')}`;
-    }
-
+    // ================== ЗАГРУЗКА/СОХРАНЕНИЕ НАСТРОЕК ==================
     function loadSettings() {
         try {
             const saved = GM_getValue('itd_fixed_settings');
@@ -319,7 +282,14 @@ function loadSettings() {
         };
     }
 
+    function formatTime(sec) {
+        if (!sec || isNaN(sec)) return '0:00';
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
 
+    // ================== БАЗОВЫЕ СТИЛИ (ПОЛНОСТЬЮ ИЗ ОРИГИНАЛА) ==================
     const baseCSS = `body{font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif!important;font-size:1rem!important;color:rgb(174 162 162)!important;background-color:rgb(4 4 4)!important;line-height:1.2!important;-webkit-font-smoothing:antialiased!important;-moz-osx-font-smoothing:grayscale!important;}.sidebar-mobile.svelte-16uf3bx{display:block!important;position:fixed!important;bottom:0!important;left:0!important;right:0!important;z-index:40!important;background-color:rgb(18 19 20 / 92%)!important;border-radius:999px!important;margin:1rem!important;padding:6px!important;-webkit-backdrop-filter:blur(8px)!important;backdrop-filter:blur(8px)!important;box-shadow:0 0 0 1px var(--itd-primary) inset!important;}.sidebar-pill.svelte-13vg9xt{border-radius:9999px!important;padding:1.05rem!important;display:flex!important;border:1px solid var(--itd-secondary)!important;flex-direction:column!important;width:80%!important;flex-wrap:nowrap!important;}.right-sidebar.svelte-1f0m1ej{display:flex!important;flex-direction:column!important;justify-content:end!important;width:0px!important;height:9999vh!important;position:fixed!important;left:calc(50%+349px)!important;top:50%!important;transform:translateY(-50%)!important;pointer-events:none!important;}.sidebar-nav.svelte-13vg9xt{display:flex!important;flex-direction:column!important;gap:2rem!important;}.profile-avatar.svelte-p40znu{position:relative!important;width:130px!important;height:130px!important;border-radius:9999px!important;border:1px solid var(--itd-secondary)!important;overflow:hidden!important;display:flex!important;align-items:center!important;justify-content:center!important;background-color:rgb(52 32 55)!important;}.sidebar-nav-item.svelte-13vg9xt{padding:0.6rem!important;border-radius:9999px!important;color:rgba(var(--itd-light-rgb),0.63)!important;position:relative!important;}.sidebar-nav-item.active.svelte-13vg9xt{background-color:var(--itd-primary)!important;color:rgb(224 236 255)!important;}.wall-post-form__submit.svelte-vw1v4s{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease-out!important;background-color:var(--itd-primary)!important;color:rgb(0 0 0)!important;font-weight:900!important;border-radius:9999px!important;}.wall-post-form__toolbar.svelte-vw1v4s{display:flex!important;align-items:center!important;justify-content:space-between!important;margin-top:0.5rem!important;padding-top:0.5rem!important;border-top:1px solid rgba(rgb(0 0 0),.5)!important;}.wall-post-form__attach-btn.svelte-vw1v4s{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;color:var(--itd-secondary)!important;padding:0.5rem!important;margin-left:-0.5rem!important;border-radius:9999px!important;background:none!important;}.profile-banner__btn.svelte-9mur0y{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;width:65px!important;height:45px!important;border-radius:9999px!important;background-color:rgb(0 0 0 / 50%)!important;color:rgb(255 255 255)!important;-webkit-backdrop-filter:blur(8px)!important;backdrop-filter:blur(5px)!important;display:flex!important;align-items:center!important;justify-content:center!important;transform:translateY(5px)!important;}.create-post__submit.svelte-1qnpi43{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;background-color:var(--itd-primary)!important;color:rgb(224 236 255)!important;font-weight:700!important;border-radius:9999px!important;}.create-post__attach-btn.svelte-1qnpi43{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;color:var(--itd-primary)!important;padding:0.5rem!important;margin-left:-0.5rem!important;border-radius:9999px!important;background:none!important;}.feed-tab.active.svelte-1thmq55{font-weight:700!important;color:var(--color-text)!important;border-bottom:2px solid var(--itd-primary)!important;}.clan-item.is-top-3.svelte-15vxund .clan-item__rank:where(.svelte-15vxund){color:var(--itd-primary)!important;font-weight:700!important;}.clan-item.is-top-3.svelte-15vxund{background:rgba(var(--itd-primary-rgb),0.1)!important;}.hashtag-link.svelte-jp7hc5{color:var(--itd-primary)!important;text-decoration:none!important;font-weight:500!important;}.user-card__follow.svelte-1u9eu0j{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;background-color:var(--itd-primary)!important;color:rgb(255 255 255)!important;font-weight:700!important;border-radius:9999px!important;}.post-action.like.liked.svelte-1055p8k{color:var(--itd-primary)!important;opacity:1!important;}.post-action.svelte-1055p8k{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;display:flex!important;align-items:center!important;gap:0.3rem!important;color:rgba(var(--itd-light-rgb),0.9)!important;opacity:.8!important;background:none!important;}.post-views.svelte-1055p8k{display:flex!important;align-items:center!important;gap:0.5rem!important;color:rgba(var(--itd-light-rgb),1)!important;opacity:.4!important;}.original-post__repost-icon.svelte-9y6twa{display:flex!important;align-items:center!important;justify-content:center!important;color:var(--itd-accent)!important;flex-shrink:0!important;}.voice-message.svelte-154nnrp{display:flex!important;align-items:center!important;gap:0.625rem!important;padding:0.5rem 0.75rem!important;background-color:rgb(47 29 50)!important;border-radius:24px!important;max-width:300px!important;min-width:200px!important;transition:background-color .2s ease!important;transition-property:background-color!important;transition-duration:0.2s!important;transition-timing-function:ease!important;transition-delay:0s!important;}.voice-message__play.svelte-154nnrp{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;width:36px!important;height:36px!important;display:flex!important;align-items:center!important;justify-content:center!important;border-radius:9999px!important;color:var(--color-card)!important;background-color:rgb(100 59 106)!important;flex-shrink:0!important;transition:transform .15s ease,background-color .15s ease!important;}.voice-message__bar.svelte-154nnrp{width:3px!important;min-height:4px!important;border-radius:1.5px!important;background-color:rgb(85 43 92)!important;transition:background-color .1s ease,transform .1s ease!important;flex-shrink:0!important;}.item-action-btn.like.liked.svelte-4g9e7z{color:var(--itd-primary)!important;opacity:1!important;}.explore-clan.is-top-3.svelte-1w567vk{background:rgba(var(--itd-primary-rgb),0.1)!important;}.explore-clan.is-top-3.svelte-1w567vk .explore-clan__rank:where(.svelte-1w567vk){color:var(--itd-primary)!important;font-weight:700!important;}.mobile-nav-item.active.svelte-16uf3bx{color:var(--itd-primary)!important;}.mobile-nav-item.svelte-16uf3bx{width:100%!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:6px!important;padding:0.5rem 0!important;border-radius:999px!important;color:rgb(217 122 238 / 50%)!important;position:relative!important;z-index:1!important;}.fab.svelte-5ery86:hover{transform:scale(1.05)!important;box-shadow:0 6px 16px var(--itd-primary)!important;}.fab.svelte-5ery86{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;position:fixed!important;bottom:100px!important;right:1rem!important;width:56px!important;height:56px!important;border-radius:9999px!important;background-color:var(--itd-primary)!important;color:rgb(0 0 0)!important;display:flex!important;align-items:center!important;justify-content:center!important;z-index:39!important;transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .3s ease,box-shadow .2s ease!important;}.profile-tab.active.svelte-1r4i2gu:after{content:""!important;position:absolute!important;bottom:0!important;left:50%!important;transform:translate(-50%)!important;width:56px!important;height:4px!important;background-color:var(--itd-primary)!important;border-radius:4px 4px 0 0!important;}.create-post__submit.svelte-1qnpi43:hover{background-color:var(--itd-primary)!important;}.sidebar-logo.svelte-13vg9xt{display:flex!important;align-items:center!important;justify-content:center!important;color:var(--itd-light)!important;transition:opacity .2s ease!important;}.create-post.svelte-1qnpi43{border:2px solid var(--itd-secondary)!important;width:100%!important;border-radius:32px!important;padding:1rem!important;position:relative!important;margin-bottom:16px!important;}.feed-card.svelte-1ooj66h{border-radius:32px!important;border:2px solid var(--itd-secondary)!important;}.feed-tab.svelte-1thmq55{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;flex:1!important;padding:1rem!important;text-align:center!important;font-weight:500!important;color:rgb(145 145 145)!important;background:none!important;transition:background-color .2s ease,color .2s ease!important;}.post-author.svelte-kvcx9g{font-weight:600!important;font-size:15px!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;line-height:1.2!important;color:var(--itd-primary)!important;text-decoration:none!important;}.post-dropdown-item.danger.svelte-kvcx9g{color:var(--itd-light)!important;}.item-author.svelte-4g9e7z{font-weight:600!important;font-size:13px!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;color:var(--itd-primary)!important;text-decoration:none!important;}.item-mention.svelte-4g9e7z{color:var(--itd-accent)!important;font-weight:500!important;text-decoration:none!important;}.show-more-replies.svelte-1m8hxxk{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;color:rgba(var(--itd-primary-rgb),0.5)!important;font-size:12px!important;font-weight:500!important;text-align:left!important;background:none!important;padding:0!important;}.comments-load-more.svelte-61nzs9{background:none!important;border:none!important;color:rgba(var(--itd-primary-rgb),0.68)!important;font-size:.875rem!important;font-weight:500!important;cursor:pointer!important;padding:0.5rem 0!important;text-align:left!important;}.notifications-tab.active.svelte-1ce0uvz{font-weight:700!important;color:var(--color-text)!important;border-bottom-color:var(--itd-primary)!important;color:var(--itd-light)!important;}.post-modal__views.svelte-1wzwwt5{display:flex!important;align-items:center!important;gap:0.375rem!important;color:rgba(var(--itd-light-rgb),1)!important;opacity:.4!important;font-size:14px!important;}.post-modal__action.svelte-1wzwwt5{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;display:flex!important;align-items:center!important;gap:0.375rem!important;color:rgba(var(--itd-light-rgb),0.9)!important;opacity:.5!important;background:none!important;font-size:14px!important;}[data-theme=dark]{--color-text:rgb(228 230 232)!important;--color-text-secondary:rgb(138 143 150)!important;--color-text-muted:rgb(106 111 118)!important;--color-background:rgb(17 17 17)!important;--color-card:rgb(14 13 14)!important;--color-border:rgba(var(--itd-primary-rgb),0.4)!important;--color-border-light:rgb(45 48 52 / 80%)!important;--color-border-secondary:var(--itd-secondary)!important;--color-item-bg:rgb(34 25 36)!important;--backdrop-background:rgb(16 18 20 / 92%)!important;--border-color:rgb(45 48 52)!important;--gradient-fade:rgb(16 18 20)!important;--color-input-bg:rgb(30 32 35)!important;--color-tabs-bg:rgb(16 18 20 / 88%)!important;--color-mobile-nav-glow:rgb(37 39 41)!important;}.settings-modal__save.svelte-1jqzo7p{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;background-color:rgba(var(--itd-primary-rgb),0.8)!important;color:rgb(255 255 255)!important;font-weight:700!important;border-radius:9999px!important;}.settings-modal__toggle.active.svelte-1jqzo7p{background-color:var(--itd-primary)!important;}.settings-modal__option--danger.svelte-1jqzo7p .settings-modal__option-icon:where(.svelte-1jqzo7p){background-color:rgba(var(--itd-accent-rgb),0.1)!important;color:var(--itd-accent)!important;}.settings-modal__option--danger.svelte-1jqzo7p .settings-modal__option-name:where(.svelte-1jqzo7p){color:var(--itd-accent)!important;}.settings-modal__option--danger.svelte-1jqzo7p:hover{background-color:rgba(var(--itd-accent-rgb),0.05)!important;}.settings-modal__option-icon.svelte-1jqzo7p{width:40px!important;height:40px!important;border-radius:9999px!important;background-color:rgba(var(--itd-primary-rgb),0.17)!important;display:flex!important;align-items:center!important;justify-content:center!important;color:var(--color-text)!important;}.post-modal__action.like.liked.svelte-1wzwwt5{color:var(--itd-primary)!important;opacity:1!important;}.hashtag-title.svelte-75az0a{font-size:1.25rem!important;font-weight:700!important;color:var(--itd-light)!important;margin:0!important;}.notification-badge--comment.svelte-1ce0uvz{background-color:var(--itd-primary)!important;}.profile-follow-btn.svelte-p40znu{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;background-color:var(--itd-primary)!important;color:rgb(0 0 0)!important;font-weight:700!important;border-radius:9999px!important;}.post-container.svelte-cvb24n:not(:last-child){border-bottom:1px solid rgba(var(--itd-primary-rgb),0.52)!important;}.profile-card.svelte-14luta1{background-color:rgb(0 0 0 / 0%)!important;width:100%!important;display:flex!important;flex-direction:column!important;border-radius:0!important;overflow:hidden!important;border:1px solid rgba(var(--itd-primary-rgb),0.52)!important;}.comments-sort-select.svelte-61nzs9{background-color:rgb(50 24 50)!important;border:1px solid var(--itd-secondary)!important;}.item-action-btn.svelte-4g9e7z{font-size:13px!important;}.drawing-btn--save.svelte-12bmgzp{background:rgba(var(--itd-secondary-rgb),0.55)!important;color:rgb(255 255 255)!important;display:flex!important;align-items:center!important;gap:0.5rem!important;}.size-btn.active.svelte-12bmgzp{background:rgba(var(--itd-primary-rgb),0.65)!important;border-color:var(--itd-secondary)!important;color:rgb(255 255 255)!important;}.profile-banner__image.svelte-9mur0y{width:100%!important;height:100%!important;object-fit:cover!important;border-radius:0px!important;}.profile-card.svelte-14luta1{background-color:rgb(0 0 0 / 0%)!important;width:120%!important;display:flex!important;flex-direction:column!important;border-radius:60px!important;overflow:hidden!important;border:1px solid rgba(var(--itd-primary-rgb),0.52)!important;}.explore-header.svelte-1w567vk{display:flex!important;align-items:center!important;gap:1rem!important;padding:0.75rem 10rem!important;border-bottom:1px solid rgb(var(--itd-secondary-rgb))!important;position:sticky!important;top:0!important;background-color:rgba(var(--itd-secondary-rgb),0.3)!important;z-index:10!important;}.explore-search__input.svelte-1w567vk{width:100%!important;background-color:var(--color-input-bg)!important;border:2px solid rgb(0 0 0 / 0%)!important;padding:0.75rem 1rem 0.75rem 3rem!important;border-radius:9999px!important;font-size:15px!important;outline:none!important;color:rgb(255 255 255)!important;transition:border-color .2s ease,background-color .2s ease!important;}.explore-card.svelte-1w567vk{background-color:rgb(0 0 0 / 0%)!important;width:100%!important;display:flex!important;flex-direction:column!important;border-radius:0!important;overflow:hidden!important;min-height:100vh!important;border:1px solid var(--itd-primary)!important;}.explore-section.svelte-1w567vk{padding:0.5rem 0!important;border-bottom:1px solid var(--itd-primary)!important;}.notifications-card.svelte-1ce0uvz{border:1px solid var(--itd-secondary)!important;}.explore-card.svelte-1w567vk{border-radius:50px!important;min-height:auto!important;}.sidebar-top.svelte-13vg9xt{display:flex!important;align-items:center!important;gap:24px!important;flex-direction:column-reverse!important;transform:translateY(-25px)!important;}.notifications-tab.svelte-1ce0uvz{border-bottom:3px solid rgba(var(--itd-primary-rgb),0.35)!important;}.notification-item.svelte-1ce0uvz{border-bottom:1px solid var(--itd-secondary)!important;}.notification-badge--like.svelte-1ce0uvz{background-color:var(--itd-secondary)!important;}.notification-badge--reply.svelte-1ce0uvz{background-color:var(--itd-secondary)!important;}.notification-badge--follow.svelte-1ce0uvz{background-color:var(--itd-secondary)!important;}.notification-badge--repost.svelte-1ce0uvz{background-color:var(--itd-secondary)!important;}.profile-tab.svelte-1r4i2gu{color:var(--itd-light)!important;}.profile-tab.active.svelte-1r4i2gu{font-weight:700!important;color:var(--itd-accent)!important;}.profile-edit-btn.svelte-p40znu{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;background-color:rgb(0 0 0 / 0%)!important;color:var(--color-text)!important;font-weight:700!important;border:1px solid var(--itd-secondary)!important;border-radius:9999px!important;padding:0.5rem 1.25rem!important;font-size:.875rem!important;transform:translateX(-400px)!important;}.profile-verify-btn.svelte-p40znu{transform:translate(-400px,0)!important;border:1px solid var(--itd-secondary)!important;}.profile-tabs.svelte-1r4i2gu{display:flex!important;margin-top:0.5rem!important;position:sticky!important;top:0!important;background-color:rgba(var(--color-card),.95)!important;z-index:10!important;border-top:1px solid var(--itd-secondary)!important;border-bottom:1px solid var(--itd-secondary)!important;backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important;}.wall-post-form.svelte-vw1v4s{border-bottom:1px solid var(--itd-secondary)!important;padding:1rem!important;background-color:rgb(0 0 0 / 0%)!important;}.comment-submit.svelte-ome0nc{background-color:var(--itd-primary)!important;cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;border-radius:24px!important;padding:0.5rem 1rem!important;color:rgb(0 0 0)!important;font-weight:700!important;}.comment-input-field.svelte-ome0nc{flex:1!important;font-size:.875rem!important;padding:0.5rem 0.75rem!important;border:1px solid var(--itd-primary)!important;border-radius:24px!important;outline:none!important;resize:none!important;overflow-y:auto!important;max-height:150px!important;line-height:1.4!important;font-family:inherit!important;background-color:var(--color-input-bg)!important;color:var(--color-text)!important;transition:border-color .2s ease!important;}.comments-sort-select.svelte-61nzs9{background-color:rgb(50 24 50)!important;border:1px solid var(--itd-secondary)!important;color:var(--color-text)!important;padding:0.5rem 0.75rem!important;border-radius:8px!important;font-size:.875rem!important;outline:none!important;cursor:pointer!important;}.original-post.svelte-9y6twa{background-color:rgb(52 47 54)!important;border-radius:16px!important;padding:1rem!important;margin-bottom:1rem!important;}.lazy-image.svelte-ad0ir9{opacity:0!important;transition:opacity .3s ease!important;background-color:rgb(22 20 22)!important;border-radius:8px!important;}.lazy-image.svelte-ad0ir9.loaded{opacity:1!important;}.post-modal__comments.svelte-1wzwwt5{padding:0.75rem 1.25rem 1rem!important;border-top:1px solid var(--itd-primary)!important;background-color:rgba(var(--color-card),0.9)!important;}`;
 
     function generateCSSWithColors() {
@@ -378,7 +348,7 @@ function loadSettings() {
         refreshAdBlock();
     }
 
-
+    // ================== РЕКЛАМНЫЙ БЛОК ==================
     function generateAdBlockHTML(colors) {
         return `
             <div style="position: fixed; bottom: 20px; left: 20px; width: 280px; border-radius: 20px; background: rgba(34,25,36,0.8); border: 2px solid ${colors.secondary}; backdrop-filter: blur(12px); padding: 16px; color: white; font-family: Inter, sans-serif; box-sizing: border-box; z-index: 99999; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
@@ -406,16 +376,18 @@ function loadSettings() {
         adBlock.innerHTML = generateAdBlockHTML(colors);
 
         const closeBtn = adBlock.querySelector('.itd-ad-close');
-        closeBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            adBlock.remove();
-            adBlockLastClosedTime = Date.now();
-            if (adBlockTimerId) clearTimeout(adBlockTimerId);
-            adBlockTimerId = setTimeout(() => {
-                tryAddAdBlock();
-            }, CONFIG.AD_BLOCK_INTERVAL);
-        });
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                adBlock.remove();
+                adBlockLastClosedTime = Date.now();
+                if (adBlockTimerId) clearTimeout(adBlockTimerId);
+                adBlockTimerId = setTimeout(() => {
+                    tryAddAdBlock();
+                }, CONFIG.AD_BLOCK_INTERVAL);
+            });
+        }
 
         document.body.appendChild(adBlock);
     }
@@ -426,7 +398,7 @@ function loadSettings() {
         tryAddAdBlock();
     }
 
-    // ================== кнопка настроек (итд+ 1.5) ==================
+    // ================== КНОПКА НАСТРОЕК ==================
     function addSettingsButton() {
         if (isSettingsButtonAdded) return;
         const sidebarNav = document.querySelector('.sidebar-nav');
@@ -453,32 +425,39 @@ function loadSettings() {
         isSettingsButtonAdded = true;
     }
 
-    function addMusicButton() {
-        if (isMusicButtonAdded) return;
+    // ================== КНОПКА ВКЛЮЧЕНИЯ ПЛЕЕРА (ВМЕСТО МЕДИАТЕКИ) ==================
+    function addPlayerToggleButton() {
+        if (isPlayerToggleButtonAdded) return;
         const sidebarNav = document.querySelector('.sidebar-nav');
         if (!sidebarNav) {
-            setTimeout(addMusicButton, 1000);
+            setTimeout(addPlayerToggleButton, 1000);
             return;
         }
-        if (sidebarNav.querySelector('.sidebar-nav-item.itd-music')) {
-            isMusicButtonAdded = true;
+        if (sidebarNav.querySelector('.sidebar-nav-item.itd-player-toggle')) {
+            isPlayerToggleButtonAdded = true;
             return;
         }
         const btn = document.createElement('a');
-        btn.className = 'sidebar-nav-item itd-music';
+        btn.className = 'sidebar-nav-item itd-player-toggle';
         btn.href = 'javascript:void(0)';
-        btn.title = 'Медиатека';
+        btn.title = 'Показать плеер';
         btn.style.cssText = 'display:flex;align-items:center;justify-content:center;';
         btn.innerHTML = '<div class="icon"><span class="material-icons" style="font-size:32px; color:var(--itd-primary);">library_music</span></div>';
         btn.addEventListener('click', e => {
             e.preventDefault();
             e.stopPropagation();
-            openMusicModal();
+            if (!settings.playerVisible) {
+                settings.playerVisible = true;
+                saveSettings();
+                if (miniPlayer) miniPlayer.style.display = 'flex';
+                else createMiniPlayer();
+            }
         });
         sidebarNav.appendChild(btn);
-        isMusicButtonAdded = true;
+        isPlayerToggleButtonAdded = true;
     }
 
+    // ================== МОДАЛЬНОЕ ОКНО НАСТРОЕК ==================
     function toggleDescription(id) {
         expandedDescriptions[id] = !expandedDescriptions[id];
         const desc = document.getElementById(`itd-desc-${id}`);
@@ -507,7 +486,7 @@ function loadSettings() {
         const modal = document.createElement('div');
         modal.id = 'itd-settings-modal';
         const gearIcon = `<img width="28" height="28" src="https://img.icons8.com/deco-color/48/settings.png" alt="settings" style="filter:drop-shadow(0 0 2px rgba(255,255,255,0.3)); margin-right:8px;">`;
-        modal.innerHTML = `<div class="modal-content"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:1px solid ${colors.secondary};padding-bottom:15px;"><h2 style="margin:0;color:${colors.primary};font-size:22px;text-shadow:0 0 10px rgba(${colors.primaryRgb},0.3);display:flex;align-items:center;">${gearIcon} Настройки ИТД+ </h2><button id="itd-modal-close" style="background:rgba(${colors.primaryRgb},0.1);border:1px solid ${colors.primary};color:${colors.primary};cursor:pointer;font-size:24px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;">✕</button></div><div class="setting-item"><div style="display:flex;align-items:center;justify-content:space-between;width:100%;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Включить стили</span><button id="itd-arrow-enabled" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.enabled ? '▲' : '▼'}</button></div><label class="toggle-switch"><input type="checkbox" id="itd-enabled" ${settings.enabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div id="itd-desc-enabled" class="setting-description" style="max-height:${expandedDescriptions.enabled ? '100px' : '0'};opacity:${expandedDescriptions.enabled ? '1' : '0'};"><div style="margin-top:10px;padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Если цвета не поменялись, нажмите F5 (Fn+5) для перезагрузки страницы.</div></div></div><div class="setting-item"><div style="display:flex;align-items:center;justify-content:space-between;width:100%;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Apple Emoji</span><button id="itd-arrow-emoji" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.emoji ? '▲' : '▼'}</button></div><label class="toggle-switch"><input type="checkbox" id="itd-emoji" ${settings.emojiEnabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div id="itd-desc-emoji" class="setting-description" style="max-height:${expandedDescriptions.emoji ? '100px' : '0'};opacity:${expandedDescriptions.emoji ? '1' : '0'};"><div style="margin-top:10px;padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Используются официальные эмодзи Apple. Могут быть некорректные отображения.</div></div></div><div class="setting-item"><div style="width:100%;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${expandedDescriptions.colors ? '10px' : '0'};"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Цветовая схема</span><button id="itd-arrow-colors" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.colors ? '▲' : '▼'}</button></div></div><div id="itd-desc-colors" class="setting-description" style="max-height:${expandedDescriptions.colors ? '100px' : '0'};opacity:${expandedDescriptions.colors ? '1' : '0'};margin-bottom:10px;"><div style="padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Баг-репорты: @yetilov_robot</div></div><select id="itd-color-scheme" style="background:rgba(34,25,36,0.8);color:white;border:1px solid ${colors.secondary};border-radius:12px;padding:10px 14px;width:100%;font-size:14px;backdrop-filter:blur(10px);">${Object.keys(colorSchemes).map(s => `<option value="${s}" ${settings.colorScheme === s ? 'selected' : ''}>${colorSchemes[s].name}</option>`).join('')}<option value="custom" ${settings.colorScheme === 'custom' ? 'selected' : ''}>Пользовательский цвет</option></select></div></div><div id="itd-custom-color-container" style="display:${settings.colorScheme === 'custom' ? 'block' : 'none'};margin-top:15px;padding:15px;background:rgba(34,25,36,0.5);border-radius:12px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-weight:500;font-size:14px;color:${colors.primary};">Свой цвет:</span><input type="color" id="itd-custom-color-picker" value="${settings.customColor || '#bc50d4'}" style="width:40px;height:40px;border-radius:8px;border:2px solid ${colors.secondary};cursor:pointer;"><input type="text" id="itd-custom-color-input" value="${settings.customColor || '#bc50d4'}" style="flex:1;background:rgba(255,255,255,0.05);color:white;border:1px solid ${colors.secondary};border-radius:8px;padding:8px 12px;font-family:'Consolas',monospace;font-size:13px;backdrop-filter:blur(5px);"></div><div style="font-size:12px;color:rgba(255,255,255,0.6);">HEX-код (например, #ff0000)</div></div><div style="margin-top:20px;padding:15px;background:rgba(34,25,36,0.5);border-radius:15px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="font-weight:600;color:${colors.primary};margin-bottom:12px;font-size:15px;text-shadow:0 0 5px rgba(${colors.primaryRgb},0.2);">🎨 Предпросмотр</div><div style="display:flex;gap:15px;flex-wrap:wrap;"><div style="display:flex;align-items:center;"><div style="background:${colors.primary};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.primary};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Основной</span></div><div style="display:flex;align-items:center;"><div style="background:${colors.secondary};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.secondary};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Вторичный</span></div><div style="display:flex;align-items:center;"><div style="background:${colors.accent};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.accent};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Акцент</span></div></div></div><div style="margin-top:15px;padding:15px;background:rgba(34,25,36,0.5);border-radius:15px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="display:flex;flex-direction:column;gap:8px;"><div style="font-weight:700;font-size:18px;color:${colors.primary};">ИТД+ v2.4.4</div><div style="font-size:14px;color:rgba(255,255,255,0.8);">Мини-плеер со списком треков, эмодзи</div><div style="margin-top:8px;font-size:13px;color:rgba(255,255,255,0.6);font-style:italic;">⚡ Кнопка списка треков в плеере</div><div style="margin-top:12px;font-size:13px;color:rgba(255,255,255,0.6);">2020-2026 <a href="https://t.me/vcb_code" target="_blank" style="color:${colors.primary};text-decoration:none;border-bottom:1px solid ${colors.primary};">VCB</a></div></div></div><div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;"><button id="itd-reset-colors" style="background:transparent;color:${colors.primary};border:1px solid ${colors.primary};padding:12px 22px;border-radius:25px;font-weight:600;cursor:pointer;font-size:14px;">Сброс</button><button id="itd-save-settings" style="background:linear-gradient(135deg,${colors.primary},${colors.accent});color:white;border:none;padding:12px 28px;border-radius:25px;font-weight:600;cursor:pointer;font-size:14px;box-shadow:0 4px 15px rgba(${colors.primaryRgb},0.3);">Сохранить</button></div></div>`;
+        modal.innerHTML = `<div class="modal-content"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:1px solid ${colors.secondary};padding-bottom:15px;"><h2 style="margin:0;color:${colors.primary};font-size:22px;text-shadow:0 0 10px rgba(${colors.primaryRgb},0.3);display:flex;align-items:center;">${gearIcon} Настройки ИТД+ </h2><button id="itd-modal-close" style="background:rgba(${colors.primaryRgb},0.1);border:1px solid ${colors.primary};color:${colors.primary};cursor:pointer;font-size:24px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;">✕</button></div><div class="setting-item"><div style="display:flex;align-items:center;justify-content:space-between;width:100%;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Включить стили</span><button id="itd-arrow-enabled" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.enabled ? '▲' : '▼'}</button></div><label class="toggle-switch"><input type="checkbox" id="itd-enabled" ${settings.enabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div id="itd-desc-enabled" class="setting-description" style="max-height:${expandedDescriptions.enabled ? '100px' : '0'};opacity:${expandedDescriptions.enabled ? '1' : '0'};"><div style="margin-top:10px;padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Если цвета не поменялись, нажмите F5 (Fn+5) для перезагрузки страницы.</div></div></div><div class="setting-item"><div style="display:flex;align-items:center;justify-content:space-between;width:100%;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Apple Emoji</span><button id="itd-arrow-emoji" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.emoji ? '▲' : '▼'}</button></div><label class="toggle-switch"><input type="checkbox" id="itd-emoji" ${settings.emojiEnabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div id="itd-desc-emoji" class="setting-description" style="max-height:${expandedDescriptions.emoji ? '100px' : '0'};opacity:${expandedDescriptions.emoji ? '1' : '0'};"><div style="margin-top:10px;padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Используются официальные эмодзи Apple. Могут быть некорректные отображения.</div></div></div><div class="setting-item"><div style="width:100%;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${expandedDescriptions.colors ? '10px' : '0'};"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Цветовая схема</span><button id="itd-arrow-colors" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.colors ? '▲' : '▼'}</button></div></div><div id="itd-desc-colors" class="setting-description" style="max-height:${expandedDescriptions.colors ? '100px' : '0'};opacity:${expandedDescriptions.colors ? '1' : '0'};margin-bottom:10px;"><div style="padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Баг-репорты: @yetilov_robot</div></div><select id="itd-color-scheme" style="background:rgba(34,25,36,0.8);color:white;border:1px solid ${colors.secondary};border-radius:12px;padding:10px 14px;width:100%;font-size:14px;backdrop-filter:blur(10px);">${Object.keys(colorSchemes).map(s => `<option value="${s}" ${settings.colorScheme === s ? 'selected' : ''}>${colorSchemes[s].name}</option>`).join('')}<option value="custom" ${settings.colorScheme === 'custom' ? 'selected' : ''}>Пользовательский цвет</option></select></div></div><div id="itd-custom-color-container" style="display:${settings.colorScheme === 'custom' ? 'block' : 'none'};margin-top:15px;padding:15px;background:rgba(34,25,36,0.5);border-radius:12px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-weight:500;font-size:14px;color:${colors.primary};">Свой цвет:</span><input type="color" id="itd-custom-color-picker" value="${settings.customColor || '#bc50d4'}" style="width:40px;height:40px;border-radius:8px;border:2px solid ${colors.secondary};cursor:pointer;"><input type="text" id="itd-custom-color-input" value="${settings.customColor || '#bc50d4'}" style="flex:1;background:rgba(255,255,255,0.05);color:white;border:1px solid ${colors.secondary};border-radius:8px;padding:8px 12px;font-family:'Consolas',monospace;font-size:13px;backdrop-filter:blur(5px);"></div><div style="font-size:12px;color:rgba(255,255,255,0.6);">HEX-код (например, #ff0000)</div></div><div style="margin-top:20px;padding:15px;background:rgba(34,25,36,0.5);border-radius:15px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="font-weight:600;color:${colors.primary};margin-bottom:12px;font-size:15px;text-shadow:0 0 5px rgba(${colors.primaryRgb},0.2);">🎨 Предпросмотр</div><div style="display:flex;gap:15px;flex-wrap:wrap;"><div style="display:flex;align-items:center;"><div style="background:${colors.primary};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.primary};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Основной</span></div><div style="display:flex;align-items:center;"><div style="background:${colors.secondary};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.secondary};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Вторичный</span></div><div style="display:flex;align-items:center;"><div style="background:${colors.accent};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.accent};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Акцент</span></div></div></div><div style="margin-top:15px;padding:15px;background:rgba(34,25,36,0.5);border-radius:15px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="display:flex;flex-direction:column;gap:8px;"><div style="font-weight:700;font-size:18px;color:${colors.primary};">ИТД+ v2.5.0</div><div style="font-size:14px;color:rgba(255,255,255,0.8);">Мини-плеер со списком треков, эмодзи</div><div style="margin-top:8px;font-size:13px;color:rgba(255,255,255,0.6);font-style:italic;">⚡ Кнопка списка треков в плеере</div><div style="margin-top:12px;font-size:13px;color:rgba(255,255,255,0.6);">2020-2026 <a href="https://t.me/vcb_code" target="_blank" style="color:${colors.primary};text-decoration:none;border-bottom:1px solid ${colors.primary};">VCB</a></div></div></div><div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;"><button id="itd-reset-colors" style="background:transparent;color:${colors.primary};border:1px solid ${colors.primary};padding:12px 22px;border-radius:25px;font-weight:600;cursor:pointer;font-size:14px;">Сброс</button><button id="itd-save-settings" style="background:linear-gradient(135deg,${colors.primary},${colors.accent});color:white;border:none;padding:12px 28px;border-radius:25px;font-weight:600;cursor:pointer;font-size:14px;box-shadow:0 4px 15px rgba(${colors.primaryRgb},0.3);">Сохранить</button></div></div>`;
         const modalStyles = `#itd-settings-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:999999;backdrop-filter:blur(8px);animation:itdFadeIn 0.2s ease;}#itd-settings-modal .modal-content{background:rgba(14,13,14,0.85);border:1px solid rgba(${colors.secondaryRgb},0.4);border-radius:28px;padding:36px;width:720px;height:720px;color:white;font-family:Inter,sans-serif;position:relative;overflow-y:auto;backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,0.5);animation:itdScaleIn 0.25s cubic-bezier(0.16,1,0.3,1);}#itd-settings-modal .setting-item{display:flex;flex-direction:column;align-items:flex-start;margin-bottom:16px;padding:16px;border-radius:16px;background:rgba(34,25,36,0.6);border:1px solid transparent;transition:all 0.15s ease;}#itd-settings-modal .setting-item:hover{background:rgba(50,24,50,0.7);border-color:rgba(${colors.primaryRgb},0.2);transform:translateY(-1px);}.setting-description{overflow:hidden;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);width:100%;}#itd-settings-modal .toggle-switch{position:relative;width:52px;height:26px;margin-left:10px;}#itd-settings-modal .toggle-switch input{opacity:0;width:0;height:0;}#itd-settings-modal .toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:rgba(255,255,255,0.1);border-radius:34px;transition:.2s;border:1px solid rgba(255,255,255,0.2);}#itd-settings-modal .toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:2px;bottom:2px;background-color:white;border-radius:50%;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,0.2);}#itd-settings-modal input:checked+.toggle-slider{background-color:${colors.primary};box-shadow:0 0 10px ${colors.primary};}#itd-settings-modal input:checked+.toggle-slider:before{transform:translateX(26px);}#itd-settings-modal::-webkit-scrollbar{width:6px;}#itd-settings-modal::-webkit-scrollbar-track{background:rgba(0,0,0,0.1);border-radius:4px;}#itd-settings-modal::-webkit-scrollbar-thumb{background:${colors.primary};border-radius:4px;}@keyframes itdFadeIn{from{opacity:0;}to{opacity:1;}}@keyframes itdScaleIn{from{transform:scale(0.96);opacity:0;}to{transform:scale(1);opacity:1;}}`;
         addStyleTag('itd-modal-styles', modalStyles);
         document.body.appendChild(modal);
@@ -575,9 +554,8 @@ function loadSettings() {
         });
     }
 
-
-
-     function createMiniPlayer() {
+    // ================== МИНИ-ПЛЕЕР (НОВАЯ ВЕРСИЯ) ==================
+    function createMiniPlayer() {
         if (miniPlayer) return;
         const colors = getCurrentColorScheme();
         miniPlayer = document.createElement('div');
@@ -597,16 +575,13 @@ function loadSettings() {
             font-family: Inter, sans-serif;
             backdrop-filter: blur(20px);
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            z-index: 10000;
-            display: none;
+            z-index: 9998;
+            display: ${settings.playerVisible ? 'flex' : 'none'};
             flex-direction: column;
             gap: 10px;
             transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
         `;
-
         miniPlayer.innerHTML = `
-
-        <!-- ЗАГОЛОВОК С КНОПКОЙ СВОРАЧИВАНИЯ -->
             <div id="itd-mini-main-row" style="display: flex; align-items: center; gap: 16px;">
                 <img id="itd-mini-cover"
                     src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 24 24' fill='%23333'%3E%3Cpath d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/%3E%3C/svg%3E"
@@ -616,11 +591,13 @@ function loadSettings() {
                     <div id="itd-mini-artist" style="font-size:0.9rem; color:#bdbdbd; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Неизвестный исполнитель</div>
                 </div>
                 <div style="display:flex; gap:8px; align-items:center;">
-                    <!-- Кнопка списка -->
+                    <label style="background:none; border:none; color:${colors.primary}; cursor:pointer; padding:4px;" title="Загрузить треки">
+                        <span class="material-icons" style="font-size:22px;">upload</span>
+                        <input type="file" id="itd-mini-fileInput" multiple accept="audio/*" style="display: none;">
+                    </label>
                     <button id="itd-mini-show-list" style="background:none; border:none; color:${colors.primary}; cursor:pointer; padding:4px;" title="Показать список треков">
                         <span class="material-icons" style="font-size:22px;">queue_music</span>
                     </button>
-                    <!-- Кнопка shuffle -->
                     <button id="itd-mini-shuffle" style="background:none; border:none; color:${shuffle ? colors.primary : '#bdbdbd'}; cursor:pointer; padding:4px;" title="Перемешать">
                         <span class="material-icons" style="font-size:22px;">shuffle</span>
                     </button>
@@ -633,14 +610,14 @@ function loadSettings() {
                     <button id="itd-mini-next" style="background:none; border:none; color:white; cursor:pointer; padding:4px;">
                         <span class="material-icons" style="font-size:22px;">skip_next</span>
                     </button>
-                    <!-- ★ КНОПКА СВОРАЧИВАНИЯ / РАЗВОРАЧИВАНИЯ ★ -->
-                    <button id="itd-mini-collapse" style="background:none; border:none; color:#bdbdbd; cursor:pointer; padding:4px; transition: transform 0.3s ease;" title="Свернуть / развернуть">
+                    <button id="itd-mini-collapse" style="background:none; border:none; color:#bdbdbd; cursor:pointer; padding:4px; transition: transform 0.3s ease;" title="Свернуть">
                         <span class="material-icons" style="font-size:20px;">expand_more</span>
+                    </button>
+                    <button id="itd-mini-close" style="background:none; border:none; color:#ff5555; cursor:pointer; padding:4px;" title="Закрыть плеер">
+                        <span class="material-icons" style="font-size:20px;">close</span>
                     </button>
                 </div>
             </div>
-
-            <!-- ПРОГРЕСС + ГРОМКОСТЬ (скрываются при сворачивании) -->
             <div id="itd-mini-bottom-row" style="display:flex; align-items:center; gap:12px; overflow:hidden; transition: all 0.3s ease; max-height: 40px; opacity: 1;">
                 <span id="itd-mini-current" style="font-size:0.85rem; color:#bdbdbd; min-width:36px;">0:00</span>
                 <input type="range" id="itd-mini-progress" min="0" max="100" value="0" step="0.1"
@@ -653,11 +630,8 @@ function loadSettings() {
                     style="width:70px; height:5px; -webkit-appearance:none; background:rgba(255,255,255,0.2); border-radius:5px; cursor:pointer;">
             </div>
         `;
-
         document.body.appendChild(miniPlayer);
 
-      // Привязываем элементы
- const miniShowList  = miniPlayer.querySelector('#itd-mini-show-list');
         const miniShuffle   = miniPlayer.querySelector('#itd-mini-shuffle');
         const miniPrev      = miniPlayer.querySelector('#itd-mini-prev');
         const miniPlayPause = miniPlayer.querySelector('#itd-mini-playpause');
@@ -674,12 +648,13 @@ function loadSettings() {
         const miniArtist    = miniPlayer.querySelector('#itd-mini-artist');
         const miniCollapse  = miniPlayer.querySelector('#itd-mini-collapse');
         const miniBottomRow = miniPlayer.querySelector('#itd-mini-bottom-row');
-        const miniMainRow   = miniPlayer.querySelector('#itd-mini-main-row');
-        // ★ ЛОГИКА СВОРАЧИВАНИЯ / РАЗВОРАЧИВАНИЯ ★
+        const miniClose     = miniPlayer.querySelector('#itd-mini-close');
+        const fileInput     = miniPlayer.querySelector('#itd-mini-fileInput');
+        const miniShowList  = miniPlayer.querySelector('#itd-mini-show-list');
+
         miniCollapse.addEventListener('click', () => {
-            miniPlayerCollapsed = !miniPlayerCollapsed;
-            if (miniPlayerCollapsed) {
-                // Свернуть: скрываем нижнюю строку и обложку
+            isPlayerMinimized = !isPlayerMinimized;
+            if (isPlayerMinimized) {
                 miniBottomRow.style.maxHeight = '0';
                 miniBottomRow.style.opacity   = '0';
                 miniBottomRow.style.marginTop = '-10px';
@@ -689,7 +664,6 @@ function loadSettings() {
                 miniCollapse.querySelector('.material-icons').textContent = 'expand_less';
                 miniCollapse.title = 'Развернуть';
             } else {
-                // Развернуть
                 miniBottomRow.style.maxHeight = '40px';
                 miniBottomRow.style.opacity   = '1';
                 miniBottomRow.style.marginTop = '0';
@@ -700,16 +674,7 @@ function loadSettings() {
                 miniCollapse.title = 'Свернуть';
             }
         });
-        // Кнопка показа списка треков
-        miniShowList.addEventListener('click', () => {
-            if (trackListPopup) {
-                closeTrackListPopup();
-            } else {
-                openTrackListPopup();
-            }
-        });
 
-        // Shuffle
         miniShuffle.addEventListener('click', () => {
             shuffle = !shuffle;
             settings.shuffle = shuffle;
@@ -717,17 +682,15 @@ function loadSettings() {
             miniShuffle.style.color = shuffle ? getCurrentColorScheme().primary : '#bdbdbd';
         });
 
-        // Play/Pause
         miniPlayPause.addEventListener('click', () => {
             if (tracks.length === 0 || currentTrackIndex === -1) return;
             if (audioElement.paused) {
-                audioElement.play();
+                audioElement.play().catch(() => {});
             } else {
                 audioElement.pause();
             }
         });
 
-        // Prev
         miniPrev.addEventListener('click', () => {
             if (tracks.length === 0) return;
             let newIndex;
@@ -741,55 +704,7 @@ function loadSettings() {
             }
             loadTrack(newIndex);
         });
-// ★ АВТОВОСПРОИЗВЕДЕНИЕ СЛЕДУЮЩЕГО ТРЕКА ★
-        function onTrackEnded() {
-            const nextIdx = getNextIndex();
-            if (nextIdx !== -1) {
-                playTrackByIndex(nextIdx);
-            } else {
-                // Список закончился
-                miniIcon.textContent = 'play_arrow';
-                miniProgress.value = 0;
-                miniCurrent.textContent = '0:00';
-                showNotification('Воспроизведение завершено 🎵');
-            }
-        }
 
-        // Функция воспроизведения по индексу
-        function playTrackByIndex(index) {
-            if (index < 0 || index >= trackList.length) return;
-            currentTrackIndex = index;
-            const track = trackList[index];
-
-            if (currentAudio) {
-                currentAudio.removeEventListener('timeupdate', onTimeUpdate);
-                currentAudio.removeEventListener('loadedmetadata', onLoadedMetadata);
-                currentAudio.removeEventListener('ended', onTrackEnded);
-                currentAudio.pause();
-            }
-
-            currentAudio = new Audio(track.url);
-            currentAudio.volume = parseFloat(miniVolume.value) || 0.8;
-            currentAudio.addEventListener('timeupdate', onTimeUpdate);
-            currentAudio.addEventListener('loadedmetadata', onLoadedMetadata);
-            currentAudio.addEventListener('ended', onTrackEnded); // ★ автовоспроизведение
-
-            miniTitle.textContent  = track.title  || 'Без названия';
-            miniArtist.textContent = track.artist || 'Неизвестный исполнитель';
-            miniCover.src = track.cover || miniCover.dataset.default;
-            miniIcon.textContent = 'pause';
-
-            currentAudio.play().catch(e => {
-                console.warn('ITD+ Player: не удалось воспроизвести трек', e);
-                miniIcon.textContent = 'play_arrow';
-            });
-
-            showMiniPlayer();
-        }
-
-
-
-        // Next
         miniNext.addEventListener('click', () => {
             if (tracks.length === 0) return;
             let newIndex;
@@ -804,45 +719,48 @@ function loadSettings() {
             loadTrack(newIndex);
         });
 
-        // Progress
         miniProgress.addEventListener('input', () => {
             if (audioElement.duration) {
                 audioElement.currentTime = (miniProgress.value / 100) * audioElement.duration;
             }
         });
 
-        // Volume
         miniVolume.addEventListener('input', () => {
             audioElement.volume = miniVolume.value;
             updateMuteIcon();
         });
 
-        // Mute
         miniMute.addEventListener('click', () => {
             audioElement.muted = !audioElement.muted;
             updateMuteIcon();
         });
 
-        function updateMuteIcon() {
-            if (miniMuteIcon) {
-                miniMuteIcon.textContent = (audioElement.muted || audioElement.volume === 0) ? 'volume_off' : 'volume_up';
-            }
-        }
+        miniClose.addEventListener('click', () => {
+            settings.playerVisible = false;
+            saveSettings();
+            miniPlayer.style.display = 'none';
+        });
 
-        // Обновление мини-плеера
-        window.updateMiniPlayer = function() {
-            if (currentTrackIndex >= 0 && tracks[currentTrackIndex]) {
-                const track = tracks[currentTrackIndex];
-                miniCover.src = track.coverUrl || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'56\' height=\'56\' viewBox=\'0 0 24 24\' fill=\'%23333\'%3E%3Cpath d=\'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z\'/%3E%3C/svg%3E';
-                miniTitle.textContent = track.title;
-                miniArtist.textContent = track.artist;
-                miniPlayer.style.display = 'flex';
+        fileInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            for (const file of files) {
+                await processFile(file);
+            }
+            if (trackListPopup) renderTrackList();
+            showNotification(`Загружено ${files.length} трек${files.length === 1 ? '' : 'ов'}`);
+            if (tracks.length > 0 && currentTrackIndex === -1) {
+                loadTrack(0);
+            }
+        });
+
+        miniShowList.addEventListener('click', () => {
+            if (trackListPopup) {
+                closeTrackListPopup();
             } else {
-                miniPlayer.style.display = 'none';
+                openTrackListPopup();
             }
-        };
+        });
 
-        // Слушатели audio
         audioElement.addEventListener('timeupdate', () => {
             if (audioElement.duration) {
                 const percent = (audioElement.currentTime / audioElement.duration) * 100;
@@ -850,18 +768,22 @@ function loadSettings() {
                 miniCurrent.textContent = formatTime(audioElement.currentTime);
             }
         });
+
         audioElement.addEventListener('loadedmetadata', () => {
             miniDuration.textContent = formatTime(audioElement.duration);
             if (currentTrackIndex >= 0 && tracks[currentTrackIndex]) {
                 tracks[currentTrackIndex].duration = audioElement.duration;
             }
         });
+
         audioElement.addEventListener('play', () => {
             miniIcon.textContent = 'pause';
         });
+
         audioElement.addEventListener('pause', () => {
             miniIcon.textContent = 'play_arrow';
         });
+
         audioElement.addEventListener('ended', () => {
             if (tracks.length > 0) {
                 let newIndex;
@@ -878,75 +800,33 @@ function loadSettings() {
         });
 
         updateMuteIcon();
+        updateMiniPlayerUI();
     }
 
-
-function showTrackListModal() {
-        const existing = document.getElementById('itd-tracklist-modal');
-        if (existing) { existing.remove(); return; }
-
-        const colors = getCurrentColorScheme();
-        const modal = document.createElement('div');
-        modal.id = 'itd-tracklist-modal';
-        modal.style.cssText = `
-            position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
-            width: 580px; max-width: 90vw; max-height: 60vh;
-            background: rgba(14,13,14,0.96); border: 1px solid ${colors.secondary};
-            border-radius: 24px; overflow-y: auto; z-index: 9999;
-            backdrop-filter: blur(20px); box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-            font-family: Inter, sans-serif; color: white;
-            padding: 12px 0; animation: itdFadeIn 0.15s ease;
-        `;
-
-        if (!trackList.length) {
-            modal.innerHTML = `<div style="padding:20px; text-align:center; color:#bdbdbd;">Список треков пуст</div>`;
-        } else {
-            trackList.forEach((track, i) => {
-                const item = document.createElement('div');
-                item.style.cssText = `
-                    display:flex; align-items:center; gap:12px; padding:10px 16px;
-                    cursor:pointer; border-radius:12px; margin:2px 8px;
-                    transition: background 0.15s;
-                    background: ${i === currentTrackIndex ? `rgba(${colors.primaryRgb},0.15)` : 'transparent'};
-                    border-left: 3px solid ${i === currentTrackIndex ? colors.primary : 'transparent'};
-                `;
-                item.innerHTML = `
-                    <span class="material-icons" style="color:${i === currentTrackIndex ? colors.primary : '#555'}; font-size:18px;">
-                        ${i === currentTrackIndex && currentAudio && !currentAudio.paused ? 'equalizer' : 'music_note'}
-                    </span>
-                    <div style="flex:1; min-width:0;">
-                        <div style="font-weight:${i === currentTrackIndex ? '600' : '400'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:${i === currentTrackIndex ? colors.primary : 'white'};">${track.title || 'Без названия'}</div>
-                        <div style="font-size:0.8rem; color:#888; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${track.artist || 'Неизвестный'}</div>
-                    </div>
-                `;
-                item.addEventListener('mouseenter', () => {
-                    if (i !== currentTrackIndex) item.style.background = 'rgba(255,255,255,0.05)';
-                });
-                item.addEventListener('mouseleave', () => {
-                    if (i !== currentTrackIndex) item.style.background = 'transparent';
-                });
-                item.addEventListener('click', () => {
-                    if (window.itdPlayTrack) window.itdPlayTrack(i);
-                    modal.remove();
-                });
-                modal.appendChild(item);
-            });
+    function updateMuteIcon() {
+        const miniMuteIcon = miniPlayer?.querySelector('#itd-mini-muteicon');
+        if (miniMuteIcon) {
+            miniMuteIcon.textContent = (audioElement.muted || audioElement.volume === 0) ? 'volume_off' : 'volume_up';
         }
-        setTimeout(() => {
-            document.addEventListener('click', function closeModal(e) {
-                if (!modal.contains(e.target) && e.target.id !== 'itd-mini-show-list') {
-                    modal.remove();
-                    document.removeEventListener('click', closeModal);
-                }
-            });
-        }, 100);
     }
+
+    function updateMiniPlayerUI() {
+        if (!miniPlayer || currentTrackIndex < 0 || !tracks[currentTrackIndex]) return;
+        const track = tracks[currentTrackIndex];
+        const miniTitle = miniPlayer.querySelector('#itd-mini-title');
+        const miniArtist = miniPlayer.querySelector('#itd-mini-artist');
+        const miniCover = miniPlayer.querySelector('#itd-mini-cover');
+        if (miniTitle) miniTitle.textContent = track.title || 'Без названия';
+        if (miniArtist) miniArtist.textContent = track.artist || 'Неизвестный исполнитель';
+        if (miniCover) miniCover.src = track.coverUrl || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'56\' height=\'56\' viewBox=\'0 0 24 24\' fill=\'%23333\'%3E%3Cpath d=\'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z\'/%3E%3C/svg%3E';
+    }
+
+    // ================== ВСПЛЫВАЮЩИЙ СПИСОК ТРЕКОВ ==================
     function openTrackListPopup() {
         if (trackListPopup) {
             trackListPopup.style.display = 'block';
             return;
         }
-
         const colors = getCurrentColorScheme();
         trackListPopup = document.createElement('div');
         trackListPopup.id = 'itd-track-list-popup';
@@ -970,41 +850,24 @@ function showTrackListModal() {
             z-index: 10001;
             display: block;
         `;
-
-        const header = document.createElement('div');
-        header.style.cssText = `
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid ${colors.secondary};
+        trackListPopup.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid ${colors.secondary};">
+                <span style="font-weight:600; font-size:1.1rem;">Все треки</span>
+                <button id="itd-close-track-list" style="background:none; border:none; color:${colors.primary}; cursor:pointer;"><span class="material-icons">close</span></button>
+            </div>
+            <div id="itd-track-list-container" style="display:flex; flex-direction:column; gap:6px;"></div>
         `;
-        header.innerHTML = `
-            <span style="font-weight:600; font-size:1.1rem;">Все треки</span>
-            <button id="itd-close-track-list" style="background:none; border:none; color:${colors.primary}; cursor:pointer;"><span class="material-icons">close</span></button>
-        `;
-        trackListPopup.appendChild(header);
-
-        const listContainer = document.createElement('div');
-        listContainer.id = 'itd-track-list-container';
-        listContainer.style.cssText = 'display:flex; flex-direction:column; gap:6px;';
-        trackListPopup.appendChild(listContainer);
-
         document.body.appendChild(trackListPopup);
+
+        trackListPopup.querySelector('#itd-close-track-list').addEventListener('click', closeTrackListPopup);
         renderTrackList();
-        const closeBtn = trackListPopup.querySelector('#itd-close-track-list');
-        closeBtn.addEventListener('click', closeTrackListPopup);
-        const miniShowBtn = miniPlayer?.querySelector('#itd-mini-show-list');
-        if (miniShowBtn) miniShowBtn.style.display = 'none';
     }
+
     function closeTrackListPopup() {
         if (trackListPopup) {
             trackListPopup.remove();
             trackListPopup = null;
         }
-        const miniShowBtn = miniPlayer?.querySelector('#itd-mini-show-list');
-        if (miniShowBtn) miniShowBtn.style.display = 'inline-flex';
     }
 
     function renderTrackList() {
@@ -1034,6 +897,7 @@ function showTrackListModal() {
                 loadTrack(index);
                 closeTrackListPopup();
             });
+
             const cover = track.coverUrl || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\' viewBox=\'0 0 24 24\' fill=\'%23333\'%3E%3Cpath d=\'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z\'/%3E%3C/svg%3E';
             item.innerHTML = `
                 <img src="${cover}" style="width:32px; height:32px; border-radius:6px; object-fit:cover;">
@@ -1046,145 +910,9 @@ function showTrackListModal() {
             container.appendChild(item);
         });
     }
-        function playTrackByIndex(index) {
-            if (index < 0 || index >= trackList.length) return;
-            currentTrackIndex = index;
-            const track = trackList[index];
 
-            if (currentAudio) {
-                currentAudio.removeEventListener('timeupdate', onTimeUpdate);
-                currentAudio.removeEventListener('loadedmetadata', onLoadedMetadata);
-                currentAudio.removeEventListener('ended', onTrackEnded);
-                currentAudio.pause();
-            }
-            currentAudio = new Audio(track.url);
-            currentAudio.volume = parseFloat(miniVolume.value) || 0.8;
-            currentAudio.addEventListener('timeupdate', onTimeUpdate);
-            currentAudio.addEventListener('loadedmetadata', onLoadedMetadata);
-            currentAudio.addEventListener('ended', onTrackEnded);
-
-            miniTitle.textContent  = track.title  || 'Без названия';
-            miniArtist.textContent = track.artist || 'Неизвестный исполнитель';
-            miniCover.src = track.cover || miniCover.dataset.default;
-            miniIcon.textContent = 'pause';
-
-            currentAudio.play().catch(e => {
-                console.warn('ITD+ Player: не удалось воспроизвести трек', e);
-                miniIcon.textContent = 'play_arrow';
-            });
-
-            showMiniPlayer();
-        }
-    function openMusicModal() {
-        if (musicModal) {
-            musicModal.style.display = 'flex';
-            renderPlaylist(musicModal);
-            return;
-        }
-
-        const colors = getCurrentColorScheme();
-        const modal = document.createElement('div');
-        modal.id = 'itd-music-modal';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000000;
-            backdrop-filter: blur(8px);
-        `;
-
-        const content = document.createElement('div');
-        content.style.cssText = `
-            background: rgba(14,13,14,0.95);
-            border: 1px solid ${colors.secondary};
-            border-radius: 20px;
-            padding: 20px;
-            width: 600px;
-            height: 500px;
-            color: white;
-            font-family: Inter, sans-serif;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-        `;
-
-        const closeBtn = document.createElement('button');
-        closeBtn.innerHTML = '✕';
-        closeBtn.style.cssText = `
-            position: absolute;
-            top: 10px;
-            right: 15px;
-            background: rgba(${colors.primaryRgb},0.2);
-            border: 1px solid ${colors.primary};
-            color: ${colors.primary};
-            font-size: 20px;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
-        `;
-        closeBtn.addEventListener('click', () => {
-            modal.remove();
-            musicModal = null;
-        });
-        const modalHTML = `
-            <div style="display: flex; flex-direction: column; height: 100%; gap: 12px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); border-radius: 16px; padding: 12px;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px; background: #ffffff1a;">
-                            <span class="material-icons" style="font-size: 24px;">library_music</span>
-                        </div>
-                        <div>
-                            <h3 style="font-weight: 600; font-size: 1rem; margin:0;">Медиатека</h3>
-                            <p style="color: #bdbdbd; font-size: 0.8rem; margin:0;" id="itd-modal-trackCount">0 треков</p>
-                        </div>
-                    </div>
-                    <label style="background: #ffffff1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 6px 12px; color: #fff; font-size:0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-                        <span class="material-icons" style="font-size: 16px;">file_upload</span>
-                        Загрузить
-                        <input type="file" id="itd-fileInput" multiple accept="audio/*" style="display: none;">
-                    </label>
-                </div>
-                <div style="flex: 1; overflow-y: auto; background: rgba(255,255,255,0.02); border-radius: 16px; padding: 8px;">
-                    <ul id="itd-playlist" style="list-style: none; margin:0; padding:0; display: flex; flex-direction: column; gap: 4px;"></ul>
-                </div>
-            </div>
-        `;
-
-        content.innerHTML = modalHTML;
-        content.appendChild(closeBtn);
-        modal.appendChild(content);
-        document.body.appendChild(modal);
-        musicModal = modal;
-        const fileInput = document.getElementById('itd-fileInput');
-        if (fileInput) {
-            fileInput.addEventListener('change', async (e) => {
-                const files = Array.from(e.target.files);
-                for (const file of files) {
-                    await processFile(file);
-                }
-                renderPlaylist(modal);
-                const trackCount = document.getElementById('itd-modal-trackCount');
-                if (trackCount) trackCount.textContent = `${tracks.length} треков`;
-                fileInput.value = '';
-            });
-        }
-
-        initMusicLibrary(modal);
-    }
-    function initMusicLibrary(modalRoot) {
+    // ================== БИБЛИОТЕКА (IndexedDB) ==================
+    function initPlayerDatabase() {
         const DB_NAME = 'localPlayerDB';
         const STORE_NAME = 'tracks';
         const request = indexedDB.open(DB_NAME, 1);
@@ -1192,17 +920,16 @@ function showTrackListModal() {
         request.onsuccess = (e) => {
             db = e.target.result;
             loadTracksFromDB().then(() => {
-                renderPlaylist(modalRoot);
-                const trackCountSpan = modalRoot.querySelector('#itd-modal-trackCount');
-                if (trackCountSpan) trackCountSpan.textContent = `${tracks.length} трек${tracks.length !== 1 ? 'ов' : ''}`;
-                if (settings.lastTrackId) {
-                    const lastIndex = tracks.findIndex(t => t.id === settings.lastTrackId);
-                    if (lastIndex !== -1) {
-                        loadTrack(lastIndex);
+                if (tracks.length > 0 && currentTrackIndex === -1) {
+                    if (settings.lastTrackId) {
+                        const idx = tracks.findIndex(t => t.id === settings.lastTrackId);
+                        if (idx !== -1) loadTrack(idx);
+                        else loadTrack(0);
+                    } else {
+                        loadTrack(0);
                     }
-                } else if (tracks.length > 0 && currentTrackIndex === -1) {
-                    loadTrack(0);
                 }
+                if (miniPlayer) updateMiniPlayerUI();
             });
         };
         request.onupgradeneeded = (e) => {
@@ -1382,112 +1109,35 @@ function showTrackListModal() {
         return btoa(binary);
     }
 
-    function renderPlaylist(root) {
-        const playlistEl = root.querySelector('#itd-playlist');
-        if (!playlistEl) return;
-        playlistEl.innerHTML = '';
-        tracks.forEach((track, index) => {
-            const li = document.createElement('li');
-            li.className = index === currentTrackIndex ? 'active' : '';
-            li.dataset.index = index;
-            li.style.cssText = 'display:flex; align-items:center; gap:8px; padding:6px; border-radius:8px; background:#ffffff03; border:1px solid rgba(255,255,255,0.03); cursor:pointer;';
-            if (index === currentTrackIndex) {
-                li.style.background = '#d0bcff1a';
-                li.style.borderColor = '#d0bcff33';
-            }
-            const cover = track.coverUrl || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\' viewBox=\'0 0 24 24\' fill=\'%23333\'%3E%3Cpath d=\'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z\'/%3E%3C/svg%3E';
-            li.innerHTML = `
-                <img src="${cover}" style="width:32px; height:32px; border-radius:6px; object-fit:cover;">
-                <div style="flex:1; min-width:0;">
-                    <div style="font-weight:600; font-size:0.8rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(track.title)}</div>
-                    <div style="font-size:0.7rem; color:#bdbdbd; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(track.artist)}</div>
-                </div>
-                <div style="font-size:0.7rem; color:#bdbdbd; margin-right:8px;">${formatTime(track.duration)}</div>
-                <button class="itd-delete-track" data-id="${track.id}" style="background:none; border:none; color:#ff5555; cursor:pointer;"><span class="material-icons" style="font-size:18px;">delete</span></button>
-            `;
-            li.addEventListener('click', (e) => {
-                if (e.target.closest('.itd-delete-track')) return;
-                loadTrack(index);
-            });
-            const deleteBtn = li.querySelector('.itd-delete-track');
-            deleteBtn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const trackId = deleteBtn.dataset.id;
-                await deleteTrackFromDB(Number(trackId));
-                const trackIndex = tracks.findIndex(t => t.id == trackId);
-                if (trackIndex !== -1) {
-                    if (trackIndex === currentTrackIndex) {
-                        audioElement.pause();
-                        audioElement.src = '';
-                        if (tracks.length > 1) {
-                            let newIndex = trackIndex;
-                            if (newIndex >= tracks.length - 1) newIndex = tracks.length - 2;
-                            tracks.splice(trackIndex, 1);
-                            loadTrack(newIndex);
-                        } else {
-                            tracks.splice(trackIndex, 1);
-                            currentTrackIndex = -1;
-                            window.updateMiniPlayer();
-                        }
-                    } else {
-                        tracks.splice(trackIndex, 1);
-                        if (trackIndex < currentTrackIndex) {
-                            currentTrackIndex--;
-                        }
-                    }
-                }
-                renderPlaylist(root);
-                const trackCountSpan = root.querySelector('#itd-modal-trackCount');
-                if (trackCountSpan) trackCountSpan.textContent = `${tracks.length} трек${tracks.length !== 1 ? 'ов' : ''}`;
-                window.updateMiniPlayer();
-                if (trackListPopup) renderTrackList();
-            });
-            playlistEl.appendChild(li);
-        });
+    function loadTrack(index) {
+        if (index < 0 || index >= tracks.length) return;
+        currentTrackIndex = index;
+        const track = tracks[index];
+
+        audioElement.src = track.audioUrl;
+        audioElement.load();
+        audioElement.volume = parseFloat(miniPlayer?.querySelector('#itd-mini-volume')?.value || 0.8);
+
+        settings.lastTrackId = track.id;
+        saveSettings();
+
+        updateMiniPlayerUI();
+        if (trackListPopup) renderTrackList();
+
+        if (settings.playerVisible) {
+            audioElement.play().catch(() => {});
+        }
     }
+
     function escapeHtml(unsafe) {
         return unsafe.replace(/[&<>"']/g, function(m) {
             if(m === '&') return '&amp;'; if(m === '<') return '&lt;'; if(m === '>') return '&gt;';
             if(m === '"') return '&quot;'; return '&#039;';
         });
     }
-    function formatTime(seconds) {
-        if (isNaN(seconds) || seconds < 0) return '0:00';
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    }
 
-    function loadTrack(index) {
-        if (index < 0 || index >= tracks.length) return;
-        if (currentTrackIndex !== -1) {
-            if (musicModal) {
-                const prevActive = musicModal.querySelector('.active');
-                if (prevActive) prevActive.classList.remove('active');
-            }
-        }
-        currentTrackIndex = index;
-        const track = tracks[index];
-
-        if (musicModal) {
-            const activeItem = musicModal.querySelector(`[data-index="${index}"]`);
-            if (activeItem) activeItem.classList.add('active');
-        }
-
-        audioElement.src = track.audioUrl;
-        audioElement.load();
-
-        settings.lastTrackId = track.id;
-        saveSettings();
-
-        window.updateMiniPlayer();
-        if (trackListPopup) renderTrackList();
-
-        if (isPlaying) {
-            audioElement.play().catch(() => {});
-        }
-    }
-  function initEmojiSystem() {
+    // ================== ЭМОДЗИ-СИСТЕМА (ПОЛНАЯ) ==================
+    function initEmojiSystem() {
         if (!settings.emojiEnabled) return removeEmojiSystem();
         removeEmojiSystem();
         const emojiStyle = document.createElement('style');
@@ -1570,6 +1220,7 @@ function showTrackListModal() {
         emojiObserver.observe(document.body, { childList: true, subtree: true });
         setTimeout(() => processEmojiDOM(), 500);
     }
+
     function removeEmojiSystem() {
         document.getElementById('apple-emoji-styles')?.remove();
         if (emojiObserver) { emojiObserver.disconnect(); emojiObserver = null; }
@@ -1579,6 +1230,8 @@ function showTrackListModal() {
         });
         processEmojiDOM = null;
     }
+
+    // ================== УВЕДОМЛЕНИЯ ==================
     function showNotification(text, isError = false) {
         document.querySelectorAll('.itd-notification').forEach(el => el.remove());
         const colors = getCurrentColorScheme();
@@ -1596,21 +1249,26 @@ function showTrackListModal() {
             setTimeout(() => notification.remove(), 150);
         }, CONFIG.NOTIFICATION_DURATION);
     }
+
+    // ================== ПЕРИОДИЧЕСКАЯ ПРОВЕРКА ==================
     function startPeriodicCheck() {
         setInterval(() => {
             if (!isSettingsButtonAdded) addSettingsButton();
-            if (!isMusicButtonAdded) addMusicButton();
+            if (!isPlayerToggleButtonAdded) addPlayerToggleButton();
             tryAddAdBlock();
         }, CONFIG.CHECK_INTERVAL);
     }
+
+    // ================== ИНИЦИАЛИЗАЦИЯ ==================
     function init() {
         applyAllStyles();
         setTimeout(addSettingsButton, 800);
-        setTimeout(addMusicButton, 800);
+        setTimeout(addPlayerToggleButton, 800);
         startPeriodicCheck();
         tryAddAdBlock();
-        createMiniPlayer();
-        initCommentsObserver();
+        initPlayerDatabase();          // загружаем треки из БД
+        createMiniPlayer();            // создаём плеер (скрыт, если playerVisible=false)
+        initEmojiPickerObserver();     // для эмодзи-кнопок
 
         if (typeof GM_registerMenuCommand !== 'undefined') {
             GM_registerMenuCommand('⚙️ Настройки ИТД+', openSettingsModal);
