@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ИТД+
 // @namespace    http://tampermonkey.net/
-// @version      v2.4.2
-// @description МИНИ ПЛЕЕР НАХУЙ! (обновлен дизайн + кнопка сворачивания)
+// @version      v2.4.4
+// @description МИНИ ПЛЕЕР НАХУЙ!
 // @author       ITD: @VCB / TG: @VCB_CODE
 // @match        https://xn--d1ah4a.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=xn--d1ah4a.com
@@ -17,10 +17,6 @@
 
 (function() {
     'use strict';
-
-
-
-    // ==================== КНОПКИ ЭМОДЗИ В ПОЛЯХ ВВОДА ====================
     function hideEmojiPickerWithDelay(delay = 300) {
         if (emojiPickerHideTimer) clearTimeout(emojiPickerHideTimer);
         emojiPickerHideTimer = setTimeout(() => {
@@ -153,7 +149,6 @@
         setInterval(() => { if (!isSettingsButtonAdded) addSettingsButton(); }, CONFIG.CHECK_INTERVAL);
     }
 
-    // ================== ПОДКЛЮЧЕНИЕ MATERIAL ICONS ==================
     function loadMaterialIcons() {
         if (!document.querySelector('link[href*="material-icons"]')) {
             const link = document.createElement('link');
@@ -164,7 +159,6 @@
     }
     loadMaterialIcons();
 
-    // ================== ПЕРЕХВАТЧИК FETCH ==================
     window.interceptedRequests = window.interceptedRequests || [];
     const originalFetch = window.fetch;
     window.fetch = function(...args) {
@@ -180,7 +174,6 @@
         return originalFetch.apply(this, args);
     };
 
-    // ================== ОСНОВНЫЕ НАСТРОЙКИ СТИЛЕЙ ==================
     const CONFIG = {
         CHECK_INTERVAL: 2000,
         NOTIFICATION_DURATION: 5000,
@@ -217,7 +210,6 @@
     let adBlockLastClosedTime = 0;
     let commentsObserver = null; // для отслеживания комментариев
 
-    // ================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ПЛЕЕРА ==================
     let tracks = [];
     let currentTrackIndex = -1;
     let isPlaying = false;
@@ -229,7 +221,6 @@
     document.body.appendChild(audioElement);
 
 
-    // ================== ЭМОДЗИ-СИСТЕМА (ПОЛНАЯ) ==================
     let emojiObserver = null;
     let emojiPickerActive = false;
     let activeEmojiField = null;
@@ -276,7 +267,7 @@ function loadSettings() {
         const s = Math.floor(sec % 60);
         return `${m}:${s.toString().padStart(2, '0')}`;
     }
-    // ================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==================
+
     function loadSettings() {
         try {
             const saved = GM_getValue('itd_fixed_settings');
@@ -328,7 +319,7 @@ function loadSettings() {
         };
     }
 
-    // ================== БАЗОВЫЕ СТИЛИ (ОРИГИНАЛЬНЫЕ) ==================
+
     const baseCSS = `body{font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif!important;font-size:1rem!important;color:rgb(174 162 162)!important;background-color:rgb(4 4 4)!important;line-height:1.2!important;-webkit-font-smoothing:antialiased!important;-moz-osx-font-smoothing:grayscale!important;}.sidebar-mobile.svelte-16uf3bx{display:block!important;position:fixed!important;bottom:0!important;left:0!important;right:0!important;z-index:40!important;background-color:rgb(18 19 20 / 92%)!important;border-radius:999px!important;margin:1rem!important;padding:6px!important;-webkit-backdrop-filter:blur(8px)!important;backdrop-filter:blur(8px)!important;box-shadow:0 0 0 1px var(--itd-primary) inset!important;}.sidebar-pill.svelte-13vg9xt{border-radius:9999px!important;padding:1.05rem!important;display:flex!important;border:1px solid var(--itd-secondary)!important;flex-direction:column!important;width:80%!important;flex-wrap:nowrap!important;}.right-sidebar.svelte-1f0m1ej{display:flex!important;flex-direction:column!important;justify-content:end!important;width:0px!important;height:9999vh!important;position:fixed!important;left:calc(50%+349px)!important;top:50%!important;transform:translateY(-50%)!important;pointer-events:none!important;}.sidebar-nav.svelte-13vg9xt{display:flex!important;flex-direction:column!important;gap:2rem!important;}.profile-avatar.svelte-p40znu{position:relative!important;width:130px!important;height:130px!important;border-radius:9999px!important;border:1px solid var(--itd-secondary)!important;overflow:hidden!important;display:flex!important;align-items:center!important;justify-content:center!important;background-color:rgb(52 32 55)!important;}.sidebar-nav-item.svelte-13vg9xt{padding:0.6rem!important;border-radius:9999px!important;color:rgba(var(--itd-light-rgb),0.63)!important;position:relative!important;}.sidebar-nav-item.active.svelte-13vg9xt{background-color:var(--itd-primary)!important;color:rgb(224 236 255)!important;}.wall-post-form__submit.svelte-vw1v4s{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease-out!important;background-color:var(--itd-primary)!important;color:rgb(0 0 0)!important;font-weight:900!important;border-radius:9999px!important;}.wall-post-form__toolbar.svelte-vw1v4s{display:flex!important;align-items:center!important;justify-content:space-between!important;margin-top:0.5rem!important;padding-top:0.5rem!important;border-top:1px solid rgba(rgb(0 0 0),.5)!important;}.wall-post-form__attach-btn.svelte-vw1v4s{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;color:var(--itd-secondary)!important;padding:0.5rem!important;margin-left:-0.5rem!important;border-radius:9999px!important;background:none!important;}.profile-banner__btn.svelte-9mur0y{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;width:65px!important;height:45px!important;border-radius:9999px!important;background-color:rgb(0 0 0 / 50%)!important;color:rgb(255 255 255)!important;-webkit-backdrop-filter:blur(8px)!important;backdrop-filter:blur(5px)!important;display:flex!important;align-items:center!important;justify-content:center!important;transform:translateY(5px)!important;}.create-post__submit.svelte-1qnpi43{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;background-color:var(--itd-primary)!important;color:rgb(224 236 255)!important;font-weight:700!important;border-radius:9999px!important;}.create-post__attach-btn.svelte-1qnpi43{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;color:var(--itd-primary)!important;padding:0.5rem!important;margin-left:-0.5rem!important;border-radius:9999px!important;background:none!important;}.feed-tab.active.svelte-1thmq55{font-weight:700!important;color:var(--color-text)!important;border-bottom:2px solid var(--itd-primary)!important;}.clan-item.is-top-3.svelte-15vxund .clan-item__rank:where(.svelte-15vxund){color:var(--itd-primary)!important;font-weight:700!important;}.clan-item.is-top-3.svelte-15vxund{background:rgba(var(--itd-primary-rgb),0.1)!important;}.hashtag-link.svelte-jp7hc5{color:var(--itd-primary)!important;text-decoration:none!important;font-weight:500!important;}.user-card__follow.svelte-1u9eu0j{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;background-color:var(--itd-primary)!important;color:rgb(255 255 255)!important;font-weight:700!important;border-radius:9999px!important;}.post-action.like.liked.svelte-1055p8k{color:var(--itd-primary)!important;opacity:1!important;}.post-action.svelte-1055p8k{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;display:flex!important;align-items:center!important;gap:0.3rem!important;color:rgba(var(--itd-light-rgb),0.9)!important;opacity:.8!important;background:none!important;}.post-views.svelte-1055p8k{display:flex!important;align-items:center!important;gap:0.5rem!important;color:rgba(var(--itd-light-rgb),1)!important;opacity:.4!important;}.original-post__repost-icon.svelte-9y6twa{display:flex!important;align-items:center!important;justify-content:center!important;color:var(--itd-accent)!important;flex-shrink:0!important;}.voice-message.svelte-154nnrp{display:flex!important;align-items:center!important;gap:0.625rem!important;padding:0.5rem 0.75rem!important;background-color:rgb(47 29 50)!important;border-radius:24px!important;max-width:300px!important;min-width:200px!important;transition:background-color .2s ease!important;transition-property:background-color!important;transition-duration:0.2s!important;transition-timing-function:ease!important;transition-delay:0s!important;}.voice-message__play.svelte-154nnrp{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;width:36px!important;height:36px!important;display:flex!important;align-items:center!important;justify-content:center!important;border-radius:9999px!important;color:var(--color-card)!important;background-color:rgb(100 59 106)!important;flex-shrink:0!important;transition:transform .15s ease,background-color .15s ease!important;}.voice-message__bar.svelte-154nnrp{width:3px!important;min-height:4px!important;border-radius:1.5px!important;background-color:rgb(85 43 92)!important;transition:background-color .1s ease,transform .1s ease!important;flex-shrink:0!important;}.item-action-btn.like.liked.svelte-4g9e7z{color:var(--itd-primary)!important;opacity:1!important;}.explore-clan.is-top-3.svelte-1w567vk{background:rgba(var(--itd-primary-rgb),0.1)!important;}.explore-clan.is-top-3.svelte-1w567vk .explore-clan__rank:where(.svelte-1w567vk){color:var(--itd-primary)!important;font-weight:700!important;}.mobile-nav-item.active.svelte-16uf3bx{color:var(--itd-primary)!important;}.mobile-nav-item.svelte-16uf3bx{width:100%!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:6px!important;padding:0.5rem 0!important;border-radius:999px!important;color:rgb(217 122 238 / 50%)!important;position:relative!important;z-index:1!important;}.fab.svelte-5ery86:hover{transform:scale(1.05)!important;box-shadow:0 6px 16px var(--itd-primary)!important;}.fab.svelte-5ery86{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;position:fixed!important;bottom:100px!important;right:1rem!important;width:56px!important;height:56px!important;border-radius:9999px!important;background-color:var(--itd-primary)!important;color:rgb(0 0 0)!important;display:flex!important;align-items:center!important;justify-content:center!important;z-index:39!important;transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .3s ease,box-shadow .2s ease!important;}.profile-tab.active.svelte-1r4i2gu:after{content:""!important;position:absolute!important;bottom:0!important;left:50%!important;transform:translate(-50%)!important;width:56px!important;height:4px!important;background-color:var(--itd-primary)!important;border-radius:4px 4px 0 0!important;}.create-post__submit.svelte-1qnpi43:hover{background-color:var(--itd-primary)!important;}.sidebar-logo.svelte-13vg9xt{display:flex!important;align-items:center!important;justify-content:center!important;color:var(--itd-light)!important;transition:opacity .2s ease!important;}.create-post.svelte-1qnpi43{border:2px solid var(--itd-secondary)!important;width:100%!important;border-radius:32px!important;padding:1rem!important;position:relative!important;margin-bottom:16px!important;}.feed-card.svelte-1ooj66h{border-radius:32px!important;border:2px solid var(--itd-secondary)!important;}.feed-tab.svelte-1thmq55{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;flex:1!important;padding:1rem!important;text-align:center!important;font-weight:500!important;color:rgb(145 145 145)!important;background:none!important;transition:background-color .2s ease,color .2s ease!important;}.post-author.svelte-kvcx9g{font-weight:600!important;font-size:15px!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;line-height:1.2!important;color:var(--itd-primary)!important;text-decoration:none!important;}.post-dropdown-item.danger.svelte-kvcx9g{color:var(--itd-light)!important;}.item-author.svelte-4g9e7z{font-weight:600!important;font-size:13px!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;color:var(--itd-primary)!important;text-decoration:none!important;}.item-mention.svelte-4g9e7z{color:var(--itd-accent)!important;font-weight:500!important;text-decoration:none!important;}.show-more-replies.svelte-1m8hxxk{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;color:rgba(var(--itd-primary-rgb),0.5)!important;font-size:12px!important;font-weight:500!important;text-align:left!important;background:none!important;padding:0!important;}.comments-load-more.svelte-61nzs9{background:none!important;border:none!important;color:rgba(var(--itd-primary-rgb),0.68)!important;font-size:.875rem!important;font-weight:500!important;cursor:pointer!important;padding:0.5rem 0!important;text-align:left!important;}.notifications-tab.active.svelte-1ce0uvz{font-weight:700!important;color:var(--color-text)!important;border-bottom-color:var(--itd-primary)!important;color:var(--itd-light)!important;}.post-modal__views.svelte-1wzwwt5{display:flex!important;align-items:center!important;gap:0.375rem!important;color:rgba(var(--itd-light-rgb),1)!important;opacity:.4!important;font-size:14px!important;}.post-modal__action.svelte-1wzwwt5{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;display:flex!important;align-items:center!important;gap:0.375rem!important;color:rgba(var(--itd-light-rgb),0.9)!important;opacity:.5!important;background:none!important;font-size:14px!important;}[data-theme=dark]{--color-text:rgb(228 230 232)!important;--color-text-secondary:rgb(138 143 150)!important;--color-text-muted:rgb(106 111 118)!important;--color-background:rgb(17 17 17)!important;--color-card:rgb(14 13 14)!important;--color-border:rgba(var(--itd-primary-rgb),0.4)!important;--color-border-light:rgb(45 48 52 / 80%)!important;--color-border-secondary:var(--itd-secondary)!important;--color-item-bg:rgb(34 25 36)!important;--backdrop-background:rgb(16 18 20 / 92%)!important;--border-color:rgb(45 48 52)!important;--gradient-fade:rgb(16 18 20)!important;--color-input-bg:rgb(30 32 35)!important;--color-tabs-bg:rgb(16 18 20 / 88%)!important;--color-mobile-nav-glow:rgb(37 39 41)!important;}.settings-modal__save.svelte-1jqzo7p{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;background-color:rgba(var(--itd-primary-rgb),0.8)!important;color:rgb(255 255 255)!important;font-weight:700!important;border-radius:9999px!important;}.settings-modal__toggle.active.svelte-1jqzo7p{background-color:var(--itd-primary)!important;}.settings-modal__option--danger.svelte-1jqzo7p .settings-modal__option-icon:where(.svelte-1jqzo7p){background-color:rgba(var(--itd-accent-rgb),0.1)!important;color:var(--itd-accent)!important;}.settings-modal__option--danger.svelte-1jqzo7p .settings-modal__option-name:where(.svelte-1jqzo7p){color:var(--itd-accent)!important;}.settings-modal__option--danger.svelte-1jqzo7p:hover{background-color:rgba(var(--itd-accent-rgb),0.05)!important;}.settings-modal__option-icon.svelte-1jqzo7p{width:40px!important;height:40px!important;border-radius:9999px!important;background-color:rgba(var(--itd-primary-rgb),0.17)!important;display:flex!important;align-items:center!important;justify-content:center!important;color:var(--color-text)!important;}.post-modal__action.like.liked.svelte-1wzwwt5{color:var(--itd-primary)!important;opacity:1!important;}.hashtag-title.svelte-75az0a{font-size:1.25rem!important;font-weight:700!important;color:var(--itd-light)!important;margin:0!important;}.notification-badge--comment.svelte-1ce0uvz{background-color:var(--itd-primary)!important;}.profile-follow-btn.svelte-p40znu{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;background-color:var(--itd-primary)!important;color:rgb(0 0 0)!important;font-weight:700!important;border-radius:9999px!important;}.post-container.svelte-cvb24n:not(:last-child){border-bottom:1px solid rgba(var(--itd-primary-rgb),0.52)!important;}.profile-card.svelte-14luta1{background-color:rgb(0 0 0 / 0%)!important;width:100%!important;display:flex!important;flex-direction:column!important;border-radius:0!important;overflow:hidden!important;border:1px solid rgba(var(--itd-primary-rgb),0.52)!important;}.comments-sort-select.svelte-61nzs9{background-color:rgb(50 24 50)!important;border:1px solid var(--itd-secondary)!important;}.item-action-btn.svelte-4g9e7z{font-size:13px!important;}.drawing-btn--save.svelte-12bmgzp{background:rgba(var(--itd-secondary-rgb),0.55)!important;color:rgb(255 255 255)!important;display:flex!important;align-items:center!important;gap:0.5rem!important;}.size-btn.active.svelte-12bmgzp{background:rgba(var(--itd-primary-rgb),0.65)!important;border-color:var(--itd-secondary)!important;color:rgb(255 255 255)!important;}.profile-banner__image.svelte-9mur0y{width:100%!important;height:100%!important;object-fit:cover!important;border-radius:0px!important;}.profile-card.svelte-14luta1{background-color:rgb(0 0 0 / 0%)!important;width:120%!important;display:flex!important;flex-direction:column!important;border-radius:60px!important;overflow:hidden!important;border:1px solid rgba(var(--itd-primary-rgb),0.52)!important;}.explore-header.svelte-1w567vk{display:flex!important;align-items:center!important;gap:1rem!important;padding:0.75rem 10rem!important;border-bottom:1px solid rgb(var(--itd-secondary-rgb))!important;position:sticky!important;top:0!important;background-color:rgba(var(--itd-secondary-rgb),0.3)!important;z-index:10!important;}.explore-search__input.svelte-1w567vk{width:100%!important;background-color:var(--color-input-bg)!important;border:2px solid rgb(0 0 0 / 0%)!important;padding:0.75rem 1rem 0.75rem 3rem!important;border-radius:9999px!important;font-size:15px!important;outline:none!important;color:rgb(255 255 255)!important;transition:border-color .2s ease,background-color .2s ease!important;}.explore-card.svelte-1w567vk{background-color:rgb(0 0 0 / 0%)!important;width:100%!important;display:flex!important;flex-direction:column!important;border-radius:0!important;overflow:hidden!important;min-height:100vh!important;border:1px solid var(--itd-primary)!important;}.explore-section.svelte-1w567vk{padding:0.5rem 0!important;border-bottom:1px solid var(--itd-primary)!important;}.notifications-card.svelte-1ce0uvz{border:1px solid var(--itd-secondary)!important;}.explore-card.svelte-1w567vk{border-radius:50px!important;min-height:auto!important;}.sidebar-top.svelte-13vg9xt{display:flex!important;align-items:center!important;gap:24px!important;flex-direction:column-reverse!important;transform:translateY(-25px)!important;}.notifications-tab.svelte-1ce0uvz{border-bottom:3px solid rgba(var(--itd-primary-rgb),0.35)!important;}.notification-item.svelte-1ce0uvz{border-bottom:1px solid var(--itd-secondary)!important;}.notification-badge--like.svelte-1ce0uvz{background-color:var(--itd-secondary)!important;}.notification-badge--reply.svelte-1ce0uvz{background-color:var(--itd-secondary)!important;}.notification-badge--follow.svelte-1ce0uvz{background-color:var(--itd-secondary)!important;}.notification-badge--repost.svelte-1ce0uvz{background-color:var(--itd-secondary)!important;}.profile-tab.svelte-1r4i2gu{color:var(--itd-light)!important;}.profile-tab.active.svelte-1r4i2gu{font-weight:700!important;color:var(--itd-accent)!important;}.profile-edit-btn.svelte-p40znu{cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;background-color:rgb(0 0 0 / 0%)!important;color:var(--color-text)!important;font-weight:700!important;border:1px solid var(--itd-secondary)!important;border-radius:9999px!important;padding:0.5rem 1.25rem!important;font-size:.875rem!important;transform:translateX(-400px)!important;}.profile-verify-btn.svelte-p40znu{transform:translate(-400px,0)!important;border:1px solid var(--itd-secondary)!important;}.profile-tabs.svelte-1r4i2gu{display:flex!important;margin-top:0.5rem!important;position:sticky!important;top:0!important;background-color:rgba(var(--color-card),.95)!important;z-index:10!important;border-top:1px solid var(--itd-secondary)!important;border-bottom:1px solid var(--itd-secondary)!important;backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important;}.wall-post-form.svelte-vw1v4s{border-bottom:1px solid var(--itd-secondary)!important;padding:1rem!important;background-color:rgb(0 0 0 / 0%)!important;}.comment-submit.svelte-ome0nc{background-color:var(--itd-primary)!important;cursor:pointer!important;border:none!important;outline:none!important;font-family:inherit!important;transition:all .2s ease!important;border-radius:24px!important;padding:0.5rem 1rem!important;color:rgb(0 0 0)!important;font-weight:700!important;}.comment-input-field.svelte-ome0nc{flex:1!important;font-size:.875rem!important;padding:0.5rem 0.75rem!important;border:1px solid var(--itd-primary)!important;border-radius:24px!important;outline:none!important;resize:none!important;overflow-y:auto!important;max-height:150px!important;line-height:1.4!important;font-family:inherit!important;background-color:var(--color-input-bg)!important;color:var(--color-text)!important;transition:border-color .2s ease!important;}.comments-sort-select.svelte-61nzs9{background-color:rgb(50 24 50)!important;border:1px solid var(--itd-secondary)!important;color:var(--color-text)!important;padding:0.5rem 0.75rem!important;border-radius:8px!important;font-size:.875rem!important;outline:none!important;cursor:pointer!important;}.original-post.svelte-9y6twa{background-color:rgb(52 47 54)!important;border-radius:16px!important;padding:1rem!important;margin-bottom:1rem!important;}.lazy-image.svelte-ad0ir9{opacity:0!important;transition:opacity .3s ease!important;background-color:rgb(22 20 22)!important;border-radius:8px!important;}.lazy-image.svelte-ad0ir9.loaded{opacity:1!important;}.post-modal__comments.svelte-1wzwwt5{padding:0.75rem 1.25rem 1rem!important;border-top:1px solid var(--itd-primary)!important;background-color:rgba(var(--color-card),0.9)!important;}`;
 
     function generateCSSWithColors() {
@@ -387,7 +378,7 @@ function loadSettings() {
         refreshAdBlock();
     }
 
-    // ================== РЕКЛАМНЫЙ БЛОК ==================
+
     function generateAdBlockHTML(colors) {
         return `
             <div style="position: fixed; bottom: 20px; left: 20px; width: 280px; border-radius: 20px; background: rgba(34,25,36,0.8); border: 2px solid ${colors.secondary}; backdrop-filter: blur(12px); padding: 16px; color: white; font-family: Inter, sans-serif; box-sizing: border-box; z-index: 99999; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
@@ -435,7 +426,7 @@ function loadSettings() {
         tryAddAdBlock();
     }
 
-    // ================== КНОПКА НАСТРОЕК ==================
+    // ================== кнопка настроек (итд+ 1.5) ==================
     function addSettingsButton() {
         if (isSettingsButtonAdded) return;
         const sidebarNav = document.querySelector('.sidebar-nav');
@@ -462,7 +453,6 @@ function loadSettings() {
         isSettingsButtonAdded = true;
     }
 
-    // ================== КНОПКА МУЗЫКИ (ДЛЯ МОДАЛКИ) ==================
     function addMusicButton() {
         if (isMusicButtonAdded) return;
         const sidebarNav = document.querySelector('.sidebar-nav');
@@ -489,7 +479,6 @@ function loadSettings() {
         isMusicButtonAdded = true;
     }
 
-    // ================== МОДАЛЬНОЕ ОКНО НАСТРОЕК ==================
     function toggleDescription(id) {
         expandedDescriptions[id] = !expandedDescriptions[id];
         const desc = document.getElementById(`itd-desc-${id}`);
@@ -518,7 +507,7 @@ function loadSettings() {
         const modal = document.createElement('div');
         modal.id = 'itd-settings-modal';
         const gearIcon = `<img width="28" height="28" src="https://img.icons8.com/deco-color/48/settings.png" alt="settings" style="filter:drop-shadow(0 0 2px rgba(255,255,255,0.3)); margin-right:8px;">`;
-        modal.innerHTML = `<div class="modal-content"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:1px solid ${colors.secondary};padding-bottom:15px;"><h2 style="margin:0;color:${colors.primary};font-size:22px;text-shadow:0 0 10px rgba(${colors.primaryRgb},0.3);display:flex;align-items:center;">${gearIcon} Настройки ИТД+ </h2><button id="itd-modal-close" style="background:rgba(${colors.primaryRgb},0.1);border:1px solid ${colors.primary};color:${colors.primary};cursor:pointer;font-size:24px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;">✕</button></div><div class="setting-item"><div style="display:flex;align-items:center;justify-content:space-between;width:100%;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Включить стили</span><button id="itd-arrow-enabled" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.enabled ? '▲' : '▼'}</button></div><label class="toggle-switch"><input type="checkbox" id="itd-enabled" ${settings.enabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div id="itd-desc-enabled" class="setting-description" style="max-height:${expandedDescriptions.enabled ? '100px' : '0'};opacity:${expandedDescriptions.enabled ? '1' : '0'};"><div style="margin-top:10px;padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Если цвета не поменялись, нажмите F5 (Fn+5) для перезагрузки страницы.</div></div></div><div class="setting-item"><div style="display:flex;align-items:center;justify-content:space-between;width:100%;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Apple Emoji</span><button id="itd-arrow-emoji" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.emoji ? '▲' : '▼'}</button></div><label class="toggle-switch"><input type="checkbox" id="itd-emoji" ${settings.emojiEnabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div id="itd-desc-emoji" class="setting-description" style="max-height:${expandedDescriptions.emoji ? '100px' : '0'};opacity:${expandedDescriptions.emoji ? '1' : '0'};"><div style="margin-top:10px;padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Используются официальные эмодзи Apple. Могут быть некорректные отображения.</div></div></div><div class="setting-item"><div style="width:100%;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${expandedDescriptions.colors ? '10px' : '0'};"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Цветовая схема</span><button id="itd-arrow-colors" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.colors ? '▲' : '▼'}</button></div></div><div id="itd-desc-colors" class="setting-description" style="max-height:${expandedDescriptions.colors ? '100px' : '0'};opacity:${expandedDescriptions.colors ? '1' : '0'};margin-bottom:10px;"><div style="padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Баг-репорты: @yetilov_robot</div></div><select id="itd-color-scheme" style="background:rgba(34,25,36,0.8);color:white;border:1px solid ${colors.secondary};border-radius:12px;padding:10px 14px;width:100%;font-size:14px;backdrop-filter:blur(10px);">${Object.keys(colorSchemes).map(s => `<option value="${s}" ${settings.colorScheme === s ? 'selected' : ''}>${colorSchemes[s].name}</option>`).join('')}<option value="custom" ${settings.colorScheme === 'custom' ? 'selected' : ''}>Пользовательский цвет</option></select></div></div><div id="itd-custom-color-container" style="display:${settings.colorScheme === 'custom' ? 'block' : 'none'};margin-top:15px;padding:15px;background:rgba(34,25,36,0.5);border-radius:12px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-weight:500;font-size:14px;color:${colors.primary};">Свой цвет:</span><input type="color" id="itd-custom-color-picker" value="${settings.customColor || '#bc50d4'}" style="width:40px;height:40px;border-radius:8px;border:2px solid ${colors.secondary};cursor:pointer;"><input type="text" id="itd-custom-color-input" value="${settings.customColor || '#bc50d4'}" style="flex:1;background:rgba(255,255,255,0.05);color:white;border:1px solid ${colors.secondary};border-radius:8px;padding:8px 12px;font-family:'Consolas',monospace;font-size:13px;backdrop-filter:blur(5px);"></div><div style="font-size:12px;color:rgba(255,255,255,0.6);">HEX-код (например, #ff0000)</div></div><div style="margin-top:20px;padding:15px;background:rgba(34,25,36,0.5);border-radius:15px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="font-weight:600;color:${colors.primary};margin-bottom:12px;font-size:15px;text-shadow:0 0 5px rgba(${colors.primaryRgb},0.2);">🎨 Предпросмотр</div><div style="display:flex;gap:15px;flex-wrap:wrap;"><div style="display:flex;align-items:center;"><div style="background:${colors.primary};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.primary};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Основной</span></div><div style="display:flex;align-items:center;"><div style="background:${colors.secondary};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.secondary};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Вторичный</span></div><div style="display:flex;align-items:center;"><div style="background:${colors.accent};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.accent};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Акцент</span></div></div></div><div style="margin-top:15px;padding:15px;background:rgba(34,25,36,0.5);border-radius:15px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="display:flex;flex-direction:column;gap:8px;"><div style="font-weight:700;font-size:18px;color:${colors.primary};">ИТД+ v3.8.0</div><div style="font-size:14px;color:rgba(255,255,255,0.8);">Мини-плеер со списком треков, эмодзи</div><div style="margin-top:8px;font-size:13px;color:rgba(255,255,255,0.6);font-style:italic;">⚡ Кнопка списка треков в плеере</div><div style="margin-top:12px;font-size:13px;color:rgba(255,255,255,0.6);">2020-2026 <a href="https://t.me/vcb_code" target="_blank" style="color:${colors.primary};text-decoration:none;border-bottom:1px solid ${colors.primary};">VCB</a></div></div></div><div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;"><button id="itd-reset-colors" style="background:transparent;color:${colors.primary};border:1px solid ${colors.primary};padding:12px 22px;border-radius:25px;font-weight:600;cursor:pointer;font-size:14px;">Сброс</button><button id="itd-save-settings" style="background:linear-gradient(135deg,${colors.primary},${colors.accent});color:white;border:none;padding:12px 28px;border-radius:25px;font-weight:600;cursor:pointer;font-size:14px;box-shadow:0 4px 15px rgba(${colors.primaryRgb},0.3);">Сохранить</button></div></div>`;
+        modal.innerHTML = `<div class="modal-content"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:1px solid ${colors.secondary};padding-bottom:15px;"><h2 style="margin:0;color:${colors.primary};font-size:22px;text-shadow:0 0 10px rgba(${colors.primaryRgb},0.3);display:flex;align-items:center;">${gearIcon} Настройки ИТД+ </h2><button id="itd-modal-close" style="background:rgba(${colors.primaryRgb},0.1);border:1px solid ${colors.primary};color:${colors.primary};cursor:pointer;font-size:24px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;">✕</button></div><div class="setting-item"><div style="display:flex;align-items:center;justify-content:space-between;width:100%;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Включить стили</span><button id="itd-arrow-enabled" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.enabled ? '▲' : '▼'}</button></div><label class="toggle-switch"><input type="checkbox" id="itd-enabled" ${settings.enabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div id="itd-desc-enabled" class="setting-description" style="max-height:${expandedDescriptions.enabled ? '100px' : '0'};opacity:${expandedDescriptions.enabled ? '1' : '0'};"><div style="margin-top:10px;padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Если цвета не поменялись, нажмите F5 (Fn+5) для перезагрузки страницы.</div></div></div><div class="setting-item"><div style="display:flex;align-items:center;justify-content:space-between;width:100%;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Apple Emoji</span><button id="itd-arrow-emoji" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.emoji ? '▲' : '▼'}</button></div><label class="toggle-switch"><input type="checkbox" id="itd-emoji" ${settings.emojiEnabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div id="itd-desc-emoji" class="setting-description" style="max-height:${expandedDescriptions.emoji ? '100px' : '0'};opacity:${expandedDescriptions.emoji ? '1' : '0'};"><div style="margin-top:10px;padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Используются официальные эмодзи Apple. Могут быть некорректные отображения.</div></div></div><div class="setting-item"><div style="width:100%;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${expandedDescriptions.colors ? '10px' : '0'};"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Цветовая схема</span><button id="itd-arrow-colors" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.colors ? '▲' : '▼'}</button></div></div><div id="itd-desc-colors" class="setting-description" style="max-height:${expandedDescriptions.colors ? '100px' : '0'};opacity:${expandedDescriptions.colors ? '1' : '0'};margin-bottom:10px;"><div style="padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Баг-репорты: @yetilov_robot</div></div><select id="itd-color-scheme" style="background:rgba(34,25,36,0.8);color:white;border:1px solid ${colors.secondary};border-radius:12px;padding:10px 14px;width:100%;font-size:14px;backdrop-filter:blur(10px);">${Object.keys(colorSchemes).map(s => `<option value="${s}" ${settings.colorScheme === s ? 'selected' : ''}>${colorSchemes[s].name}</option>`).join('')}<option value="custom" ${settings.colorScheme === 'custom' ? 'selected' : ''}>Пользовательский цвет</option></select></div></div><div id="itd-custom-color-container" style="display:${settings.colorScheme === 'custom' ? 'block' : 'none'};margin-top:15px;padding:15px;background:rgba(34,25,36,0.5);border-radius:12px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-weight:500;font-size:14px;color:${colors.primary};">Свой цвет:</span><input type="color" id="itd-custom-color-picker" value="${settings.customColor || '#bc50d4'}" style="width:40px;height:40px;border-radius:8px;border:2px solid ${colors.secondary};cursor:pointer;"><input type="text" id="itd-custom-color-input" value="${settings.customColor || '#bc50d4'}" style="flex:1;background:rgba(255,255,255,0.05);color:white;border:1px solid ${colors.secondary};border-radius:8px;padding:8px 12px;font-family:'Consolas',monospace;font-size:13px;backdrop-filter:blur(5px);"></div><div style="font-size:12px;color:rgba(255,255,255,0.6);">HEX-код (например, #ff0000)</div></div><div style="margin-top:20px;padding:15px;background:rgba(34,25,36,0.5);border-radius:15px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="font-weight:600;color:${colors.primary};margin-bottom:12px;font-size:15px;text-shadow:0 0 5px rgba(${colors.primaryRgb},0.2);">🎨 Предпросмотр</div><div style="display:flex;gap:15px;flex-wrap:wrap;"><div style="display:flex;align-items:center;"><div style="background:${colors.primary};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.primary};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Основной</span></div><div style="display:flex;align-items:center;"><div style="background:${colors.secondary};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.secondary};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Вторичный</span></div><div style="display:flex;align-items:center;"><div style="background:${colors.accent};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.accent};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Акцент</span></div></div></div><div style="margin-top:15px;padding:15px;background:rgba(34,25,36,0.5);border-radius:15px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="display:flex;flex-direction:column;gap:8px;"><div style="font-weight:700;font-size:18px;color:${colors.primary};">ИТД+ v2.4.4</div><div style="font-size:14px;color:rgba(255,255,255,0.8);">Мини-плеер со списком треков, эмодзи</div><div style="margin-top:8px;font-size:13px;color:rgba(255,255,255,0.6);font-style:italic;">⚡ Кнопка списка треков в плеере</div><div style="margin-top:12px;font-size:13px;color:rgba(255,255,255,0.6);">2020-2026 <a href="https://t.me/vcb_code" target="_blank" style="color:${colors.primary};text-decoration:none;border-bottom:1px solid ${colors.primary};">VCB</a></div></div></div><div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;"><button id="itd-reset-colors" style="background:transparent;color:${colors.primary};border:1px solid ${colors.primary};padding:12px 22px;border-radius:25px;font-weight:600;cursor:pointer;font-size:14px;">Сброс</button><button id="itd-save-settings" style="background:linear-gradient(135deg,${colors.primary},${colors.accent});color:white;border:none;padding:12px 28px;border-radius:25px;font-weight:600;cursor:pointer;font-size:14px;box-shadow:0 4px 15px rgba(${colors.primaryRgb},0.3);">Сохранить</button></div></div>`;
         const modalStyles = `#itd-settings-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:999999;backdrop-filter:blur(8px);animation:itdFadeIn 0.2s ease;}#itd-settings-modal .modal-content{background:rgba(14,13,14,0.85);border:1px solid rgba(${colors.secondaryRgb},0.4);border-radius:28px;padding:36px;width:720px;height:720px;color:white;font-family:Inter,sans-serif;position:relative;overflow-y:auto;backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,0.5);animation:itdScaleIn 0.25s cubic-bezier(0.16,1,0.3,1);}#itd-settings-modal .setting-item{display:flex;flex-direction:column;align-items:flex-start;margin-bottom:16px;padding:16px;border-radius:16px;background:rgba(34,25,36,0.6);border:1px solid transparent;transition:all 0.15s ease;}#itd-settings-modal .setting-item:hover{background:rgba(50,24,50,0.7);border-color:rgba(${colors.primaryRgb},0.2);transform:translateY(-1px);}.setting-description{overflow:hidden;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);width:100%;}#itd-settings-modal .toggle-switch{position:relative;width:52px;height:26px;margin-left:10px;}#itd-settings-modal .toggle-switch input{opacity:0;width:0;height:0;}#itd-settings-modal .toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:rgba(255,255,255,0.1);border-radius:34px;transition:.2s;border:1px solid rgba(255,255,255,0.2);}#itd-settings-modal .toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:2px;bottom:2px;background-color:white;border-radius:50%;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,0.2);}#itd-settings-modal input:checked+.toggle-slider{background-color:${colors.primary};box-shadow:0 0 10px ${colors.primary};}#itd-settings-modal input:checked+.toggle-slider:before{transform:translateX(26px);}#itd-settings-modal::-webkit-scrollbar{width:6px;}#itd-settings-modal::-webkit-scrollbar-track{background:rgba(0,0,0,0.1);border-radius:4px;}#itd-settings-modal::-webkit-scrollbar-thumb{background:${colors.primary};border-radius:4px;}@keyframes itdFadeIn{from{opacity:0;}to{opacity:1;}}@keyframes itdScaleIn{from{transform:scale(0.96);opacity:0;}to{transform:scale(1);opacity:1;}}`;
         addStyleTag('itd-modal-styles', modalStyles);
         document.body.appendChild(modal);
@@ -586,8 +575,6 @@ function loadSettings() {
         });
     }
 
-
-    // ================== МИНИ-ПЛЕЕР (С КНОПКОЙ СПИСКА) ==================
 
 
      function createMiniPlayer() {
@@ -893,7 +880,7 @@ function loadSettings() {
         updateMuteIcon();
     }
 
-    // ================== ВСПЛЫВАЮЩИЙ СПИСОК ТРЕКОВ ==================
+
 function showTrackListModal() {
         const existing = document.getElementById('itd-tracklist-modal');
         if (existing) { existing.remove(); return; }
@@ -945,7 +932,6 @@ function showTrackListModal() {
                 modal.appendChild(item);
             });
         }
-        // Закрытие при клике вне
         setTimeout(() => {
             document.addEventListener('click', function closeModal(e) {
                 if (!modal.contains(e.target) && e.target.id !== 'itd-mini-show-list') {
@@ -1006,25 +992,17 @@ function showTrackListModal() {
         trackListPopup.appendChild(listContainer);
 
         document.body.appendChild(trackListPopup);
-
-        // Заполняем список
         renderTrackList();
-
-        // Кнопка закрытия
         const closeBtn = trackListPopup.querySelector('#itd-close-track-list');
         closeBtn.addEventListener('click', closeTrackListPopup);
-
-        // Скрываем кнопку вызова в мини-плеере
         const miniShowBtn = miniPlayer?.querySelector('#itd-mini-show-list');
         if (miniShowBtn) miniShowBtn.style.display = 'none';
     }
-
     function closeTrackListPopup() {
         if (trackListPopup) {
             trackListPopup.remove();
             trackListPopup = null;
         }
-        // Показываем кнопку вызова в мини-плеере
         const miniShowBtn = miniPlayer?.querySelector('#itd-mini-show-list');
         if (miniShowBtn) miniShowBtn.style.display = 'inline-flex';
     }
@@ -1056,7 +1034,6 @@ function showTrackListModal() {
                 loadTrack(index);
                 closeTrackListPopup();
             });
-
             const cover = track.coverUrl || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\' viewBox=\'0 0 24 24\' fill=\'%23333\'%3E%3Cpath d=\'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z\'/%3E%3C/svg%3E';
             item.innerHTML = `
                 <img src="${cover}" style="width:32px; height:32px; border-radius:6px; object-fit:cover;">
@@ -1069,9 +1046,6 @@ function showTrackListModal() {
             container.appendChild(item);
         });
     }
-
-
-        // Функция воспроизведения по индексу
         function playTrackByIndex(index) {
             if (index < 0 || index >= trackList.length) return;
             currentTrackIndex = index;
@@ -1083,12 +1057,11 @@ function showTrackListModal() {
                 currentAudio.removeEventListener('ended', onTrackEnded);
                 currentAudio.pause();
             }
-
             currentAudio = new Audio(track.url);
             currentAudio.volume = parseFloat(miniVolume.value) || 0.8;
             currentAudio.addEventListener('timeupdate', onTimeUpdate);
             currentAudio.addEventListener('loadedmetadata', onLoadedMetadata);
-            currentAudio.addEventListener('ended', onTrackEnded); // ★ автовоспроизведение
+            currentAudio.addEventListener('ended', onTrackEnded);
 
             miniTitle.textContent  = track.title  || 'Без названия';
             miniArtist.textContent = track.artist || 'Неизвестный исполнитель';
@@ -1102,11 +1075,10 @@ function showTrackListModal() {
 
             showMiniPlayer();
         }
-    // ================== МОДАЛЬНОЕ ОКНО МЕДИАТЕКИ (ДЛЯ ПОЛНОЙ БИБЛИОТЕКИ) ==================
     function openMusicModal() {
         if (musicModal) {
             musicModal.style.display = 'flex';
-            renderPlaylist(musicModal); // обновляем плейлист на случай изменений
+            renderPlaylist(musicModal);
             return;
         }
 
@@ -1167,7 +1139,6 @@ function showTrackListModal() {
             modal.remove();
             musicModal = null;
         });
-
         const modalHTML = `
             <div style="display: flex; flex-direction: column; height: 100%; gap: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); border-radius: 16px; padding: 12px;">
@@ -1197,8 +1168,6 @@ function showTrackListModal() {
         modal.appendChild(content);
         document.body.appendChild(modal);
         musicModal = modal;
-
-        // ✅ ДОБАВЛЯЕМ ОБРАБОТЧИК СОБЫТИЙ!
         const fileInput = document.getElementById('itd-fileInput');
         if (fileInput) {
             fileInput.addEventListener('change', async (e) => {
@@ -1215,8 +1184,6 @@ function showTrackListModal() {
 
         initMusicLibrary(modal);
     }
-
-    // ================== ЛОГИКА БИБЛИОТЕКИ (IndexedDB) ==================
     function initMusicLibrary(modalRoot) {
         const DB_NAME = 'localPlayerDB';
         const STORE_NAME = 'tracks';
@@ -1228,7 +1195,6 @@ function showTrackListModal() {
                 renderPlaylist(modalRoot);
                 const trackCountSpan = modalRoot.querySelector('#itd-modal-trackCount');
                 if (trackCountSpan) trackCountSpan.textContent = `${tracks.length} трек${tracks.length !== 1 ? 'ов' : ''}`;
-                // Восстанавливаем последний активный трек
                 if (settings.lastTrackId) {
                     const lastIndex = tracks.findIndex(t => t.id === settings.lastTrackId);
                     if (lastIndex !== -1) {
@@ -1429,7 +1395,6 @@ function showTrackListModal() {
                 li.style.background = '#d0bcff1a';
                 li.style.borderColor = '#d0bcff33';
             }
-
             const cover = track.coverUrl || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\' viewBox=\'0 0 24 24\' fill=\'%23333\'%3E%3Cpath d=\'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z\'/%3E%3C/svg%3E';
             li.innerHTML = `
                 <img src="${cover}" style="width:32px; height:32px; border-radius:6px; object-fit:cover;">
@@ -1480,14 +1445,12 @@ function showTrackListModal() {
             playlistEl.appendChild(li);
         });
     }
-
     function escapeHtml(unsafe) {
         return unsafe.replace(/[&<>"']/g, function(m) {
             if(m === '&') return '&amp;'; if(m === '<') return '&lt;'; if(m === '>') return '&gt;';
             if(m === '"') return '&quot;'; return '&#039;';
         });
     }
-
     function formatTime(seconds) {
         if (isNaN(seconds) || seconds < 0) return '0:00';
         const mins = Math.floor(seconds / 60);
@@ -1524,8 +1487,6 @@ function showTrackListModal() {
             audioElement.play().catch(() => {});
         }
     }
-
-    // ================== ЭМОДЗИ-СИСТЕМА (ПОЛНАЯ) ==================
   function initEmojiSystem() {
         if (!settings.emojiEnabled) return removeEmojiSystem();
         removeEmojiSystem();
@@ -1609,7 +1570,6 @@ function showTrackListModal() {
         emojiObserver.observe(document.body, { childList: true, subtree: true });
         setTimeout(() => processEmojiDOM(), 500);
     }
-
     function removeEmojiSystem() {
         document.getElementById('apple-emoji-styles')?.remove();
         if (emojiObserver) { emojiObserver.disconnect(); emojiObserver = null; }
@@ -1619,9 +1579,6 @@ function showTrackListModal() {
         });
         processEmojiDOM = null;
     }
-
-
-    // ================== УВЕДОМЛЕНИЯ ==================
     function showNotification(text, isError = false) {
         document.querySelectorAll('.itd-notification').forEach(el => el.remove());
         const colors = getCurrentColorScheme();
@@ -1639,8 +1596,6 @@ function showTrackListModal() {
             setTimeout(() => notification.remove(), 150);
         }, CONFIG.NOTIFICATION_DURATION);
     }
-
-    // ================== ПЕРИОДИЧЕСКАЯ ПРОВЕРКА ==================
     function startPeriodicCheck() {
         setInterval(() => {
             if (!isSettingsButtonAdded) addSettingsButton();
@@ -1648,8 +1603,6 @@ function showTrackListModal() {
             tryAddAdBlock();
         }, CONFIG.CHECK_INTERVAL);
     }
-
-    // ================== ИНИЦИАЛИЗАЦИЯ ==================
     function init() {
         applyAllStyles();
         setTimeout(addSettingsButton, 800);
