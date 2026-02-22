@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ИТД+
 // @namespace    http://tampermonkey.net/
-// @version      v2.4.0
-// @description МИНИ ПЛЕЕР НАХУЙ!
+// @version      v2.4.2
+// @description МИНИ ПЛЕЕР НАХУЙ! (обновлен дизайн + кнопка сворачивания)
 // @author       ITD: @VCB / TG: @VCB_CODE
 // @match        https://xn--d1ah4a.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=xn--d1ah4a.com
@@ -17,6 +17,141 @@
 
 (function() {
     'use strict';
+
+
+
+    // ==================== КНОПКИ ЭМОДЗИ В ПОЛЯХ ВВОДА ====================
+    function hideEmojiPickerWithDelay(delay = 300) {
+        if (emojiPickerHideTimer) clearTimeout(emojiPickerHideTimer);
+        emojiPickerHideTimer = setTimeout(() => {
+            if (emojiPickerElement) { emojiPickerElement.remove(); emojiPickerElement = null; emojiPickerActive = false; emojiPickerCurrentButton = null; }
+        }, delay);
+    }
+
+    function cancelHideTimer() {
+        if (emojiPickerHideTimer) { clearTimeout(emojiPickerHideTimer); emojiPickerHideTimer = null; }
+    }
+
+    function showEmojiPickerOnHover(button, field) {
+        if (emojiPickerElement) { activeEmojiField = field; emojiPickerCurrentButton = button; cancelHideTimer(); return; }
+        activeEmojiField = field; emojiPickerCurrentButton = button;
+        const colors = getCurrentColorScheme();
+        const picker = document.createElement('div');
+        picker.className = 'itd-emoji-picker';
+        picker.style.cssText = `position:fixed;background:rgba(14,13,14,0.95);border:1px solid ${colors.secondary};border-radius:20px;padding:15px;width:500px;max-height:450px;overflow-y:auto;z-index:1000000;backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,0.5);`;
+
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.2);';
+        const title = document.createElement('span');
+        title.textContent = 'Выберите эмодзи';
+        title.style.cssText = 'color:white;font-weight:600;';
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '✕';
+        closeBtn.style.cssText = `background:none;border:none;color:${colors.primary};font-size:22px;cursor:pointer;padding:0 8px;`;
+        closeBtn.addEventListener('click', e => { e.stopPropagation(); picker.remove(); emojiPickerElement = null; emojiPickerActive = false; });
+        header.appendChild(title); header.appendChild(closeBtn); picker.appendChild(header);
+
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display:grid;grid-template-columns:repeat(8,1fr);gap:8px;';
+        const emojiList = ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🥸','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🤭','🤫','🤥','😶','😐','😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕','🤑','🤠','😈','👿','👹','👺','🤡','💩','👻','💀','☠️','👽','👾','🤖','🎃','❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','💯','🔥','✨','⭐','🌟','💫','🎵','🎶','🎉','🎊','🎈','🍕','🍔','🍟','🌮','🌯','🍜','🍣','🍩','🍪','🎂','🍰','☕','🧋','🥂','🍷'];
+        emojiList.forEach(emoji => {
+            const span = document.createElement('span');
+            span.textContent = emoji;
+            span.style.cssText = 'font-size:28px;cursor:pointer;padding:6px;border-radius:8px;text-align:center;transition:background 0.1s;';
+            span.addEventListener('mouseenter', () => { span.style.background = colors.primary + '40'; });
+            span.addEventListener('mouseleave', () => { span.style.background = 'none'; });
+            span.addEventListener('click', () => {
+                if (!activeEmojiField) return;
+                if (activeEmojiField.isContentEditable) {
+                    document.execCommand('insertText', false, emoji + ' ');
+                } else {
+                    const s = activeEmojiField.selectionStart, e2 = activeEmojiField.selectionEnd;
+                    activeEmojiField.value = activeEmojiField.value.substring(0, s) + emoji + ' ' + activeEmojiField.value.substring(e2);
+                    activeEmojiField.selectionStart = activeEmojiField.selectionEnd = s + emoji.length + 1;
+                    activeEmojiField.focus();
+                }
+            });
+            grid.appendChild(span);
+        });
+        picker.appendChild(grid);
+        picker.addEventListener('mouseenter', () => cancelHideTimer());
+        picker.addEventListener('mouseleave', () => hideEmojiPickerWithDelay(300));
+        document.body.appendChild(picker);
+        emojiPickerElement = picker; emojiPickerActive = true;
+
+        const rect = button.getBoundingClientRect();
+        const pickerHeight = picker.offsetHeight || 400;
+        let top = rect.bottom + window.scrollY + 5;
+        if (top + pickerHeight > window.scrollY + window.innerHeight) top = rect.top + window.scrollY - pickerHeight - 5;
+        let left = rect.left + window.scrollX - 250;
+        if (left < 10) left = 10;
+        if (left + 500 > window.innerWidth - 10) left = window.innerWidth - 510;
+        picker.style.top = top + 'px'; picker.style.left = left + 'px';
+    }
+
+    // ★ ДОБАВЛЕНИЕ КНОПКИ ЭМОДЗИ В ТЕКСТОВЫЕ ПОЛЯ (из 2.201.js) ★
+    function addEmojiPickerButton() {
+        if (!settings.emojiEnabled) return;
+        ['.create-post', '.wall-post-form'].forEach(selector => {
+            const container = document.querySelector(selector);
+            if (!container) return;
+            const toolbar = container.querySelector('.create-post__attach, .wall-post-form__attach');
+            if (toolbar && !toolbar.querySelector('.itd-emoji-picker-btn')) {
+                const colors = getCurrentColorScheme();
+                const btn = document.createElement('button');
+                btn.className = 'itd-emoji-picker-btn';
+                const existingBtn = toolbar.querySelector('button');
+                if (existingBtn) btn.classList.add(...existingBtn.classList);
+                else btn.classList.add('create-post__attach-btn');
+                btn.title = 'Выбрать эмодзи'; btn.innerHTML = '😀';
+                btn.style.cssText = `font-size:20px;padding:0.5rem;background:none;border:none;color:${colors.primary};cursor:pointer;`;
+                const getField = () => selector === '.create-post'
+                    ? container.querySelector('.create-post__editor[contenteditable="true"]')
+                    : container.querySelector('.wall-post-form__editor[contenteditable="true"]');
+                btn.addEventListener('mouseenter', () => { const f = getField(); if (f) showEmojiPickerOnHover(btn, f); });
+                btn.addEventListener('mouseleave', () => hideEmojiPickerWithDelay(300));
+                btn.addEventListener('click', e => {
+                    e.preventDefault(); e.stopPropagation();
+                    const f = getField(); if (!f) return;
+                    if (emojiPickerElement) { emojiPickerElement.remove(); emojiPickerElement = null; emojiPickerActive = false; }
+                    else showEmojiPickerOnHover(btn, f);
+                });
+                toolbar.appendChild(btn);
+            }
+        });
+
+        const commentForm = document.querySelector('.comment-input-form');
+        if (commentForm && !commentForm.querySelector('.itd-emoji-picker-btn')) {
+            const colors = getCurrentColorScheme();
+            const btn = document.createElement('button');
+            btn.className = 'itd-emoji-picker-btn comment-attach-btn';
+            btn.title = 'Выбрать эмодзи'; btn.innerHTML = '😀';
+            btn.style.cssText = `font-size:20px;padding:0.375rem;background:none;border:none;color:${colors.primary};cursor:pointer;`;
+            const getField = () => commentForm.querySelector('textarea.comment-input-field');
+            btn.addEventListener('mouseenter', () => { const f = getField(); if (f) showEmojiPickerOnHover(btn, f); });
+            btn.addEventListener('mouseleave', () => hideEmojiPickerWithDelay(300));
+            btn.addEventListener('click', e => {
+                e.preventDefault(); e.stopPropagation();
+                const f = getField(); if (!f) return;
+                if (emojiPickerElement) { emojiPickerElement.remove(); emojiPickerElement = null; emojiPickerActive = false; }
+                else showEmojiPickerOnHover(btn, f);
+            });
+            const attachBtn = commentForm.querySelector('.comment-attach-btn');
+            if (attachBtn) attachBtn.parentNode.insertBefore(btn, attachBtn.nextSibling);
+            else commentForm.insertBefore(btn, commentForm.firstChild);
+        }
+    }
+
+    function initEmojiPickerObserver() {
+        const observer = new MutationObserver(() => addEmojiPickerButton());
+        observer.observe(document.body, { childList: true, subtree: true });
+        setTimeout(addEmojiPickerButton, 500);
+        setInterval(addEmojiPickerButton, 2000);
+    }
+
+    function startPeriodicCheck() {
+        setInterval(() => { if (!isSettingsButtonAdded) addSettingsButton(); }, CONFIG.CHECK_INTERVAL);
+    }
 
     // ================== ПОДКЛЮЧЕНИЕ MATERIAL ICONS ==================
     function loadMaterialIcons() {
@@ -93,6 +228,7 @@
     audioElement.style.display = 'none';
     document.body.appendChild(audioElement);
 
+
     // ================== ЭМОДЗИ-СИСТЕМА (ПОЛНАЯ) ==================
     let emojiObserver = null;
     let emojiPickerActive = false;
@@ -101,7 +237,45 @@
     let emojiPickerElement = null;
     let emojiPickerHideTimer = null;
     let emojiPickerCurrentButton = null;
+    let miniPlayerCollapsed = false; // <-- состояние сворачивания
+function loadSettings() {
+        try {
+            const saved = GM_getValue('itd_fixed_settings');
+            return saved ? JSON.parse(saved) : { ...defaultSettings };
+        } catch (e) {
+            return { ...defaultSettings };
+        }
+    }
 
+    function saveSettings() {
+        GM_setValue('itd_fixed_settings', JSON.stringify(settings));
+    }
+
+    function hexToRgb(hex) {
+        hex = hex.replace('#', '');
+        if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        return `${r}, ${g}, ${b}`;
+    }
+
+    function getCurrentColorScheme() {
+        if (settings.colorScheme === 'custom' && settings.customColor) {
+            const color = settings.customColor;
+            const rgb = hexToRgb(color);
+            return { name: 'Пользовательская', primary: color, secondary: color, accent: color, light: color, dark: color, primaryRgb: rgb, secondaryRgb: rgb, accentRgb: rgb, lightRgb: rgb, darkRgb: rgb };
+        }
+        const scheme = colorSchemes[settings.colorScheme] || colorSchemes.purple;
+        return { ...scheme, primaryRgb: hexToRgb(scheme.primary), secondaryRgb: hexToRgb(scheme.secondary), accentRgb: hexToRgb(scheme.accent), lightRgb: hexToRgb(scheme.light), darkRgb: hexToRgb(scheme.dark) };
+    }
+
+    function formatTime(sec) {
+        if (!sec || isNaN(sec)) return '0:00';
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
     // ================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==================
     function loadSettings() {
         try {
@@ -344,7 +518,7 @@
         const modal = document.createElement('div');
         modal.id = 'itd-settings-modal';
         const gearIcon = `<img width="28" height="28" src="https://img.icons8.com/deco-color/48/settings.png" alt="settings" style="filter:drop-shadow(0 0 2px rgba(255,255,255,0.3)); margin-right:8px;">`;
-        modal.innerHTML = `<div class="modal-content"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:1px solid ${colors.secondary};padding-bottom:15px;"><h2 style="margin:0;color:${colors.primary};font-size:22px;text-shadow:0 0 10px rgba(${colors.primaryRgb},0.3);display:flex;align-items:center;">${gearIcon} Настройки ИТД+ </h2><button id="itd-modal-close" style="background:rgba(${colors.primaryRgb},0.1);border:1px solid ${colors.primary};color:${colors.primary};cursor:pointer;font-size:24px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;">✕</button></div><div class="setting-item"><div style="display:flex;align-items:center;justify-content:space-between;width:100%;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Включить стили</span><button id="itd-arrow-enabled" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.enabled ? '▲' : '▼'}</button></div><label class="toggle-switch"><input type="checkbox" id="itd-enabled" ${settings.enabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div id="itd-desc-enabled" class="setting-description" style="max-height:${expandedDescriptions.enabled ? '100px' : '0'};opacity:${expandedDescriptions.enabled ? '1' : '0'};"><div style="margin-top:10px;padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Если цвета не поменялись, нажмите F5 (Fn+5) для перезагрузки страницы.</div></div></div><div class="setting-item"><div style="display:flex;align-items:center;justify-content:space-between;width:100%;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Apple Emoji</span><button id="itd-arrow-emoji" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.emoji ? '▲' : '▼'}</button></div><label class="toggle-switch"><input type="checkbox" id="itd-emoji" ${settings.emojiEnabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div id="itd-desc-emoji" class="setting-description" style="max-height:${expandedDescriptions.emoji ? '100px' : '0'};opacity:${expandedDescriptions.emoji ? '1' : '0'};"><div style="margin-top:10px;padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Используются официальные эмодзи Apple. Могут быть некорректные отображения.</div></div></div><div class="setting-item"><div style="width:100%;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${expandedDescriptions.colors ? '10px' : '0'};"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Цветовая схема</span><button id="itd-arrow-colors" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.colors ? '▲' : '▼'}</button></div></div><div id="itd-desc-colors" class="setting-description" style="max-height:${expandedDescriptions.colors ? '100px' : '0'};opacity:${expandedDescriptions.colors ? '1' : '0'};margin-bottom:10px;"><div style="padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Баг-репорты: @yetilov_robot</div></div><select id="itd-color-scheme" style="background:rgba(34,25,36,0.8);color:white;border:1px solid ${colors.secondary};border-radius:12px;padding:10px 14px;width:100%;font-size:14px;backdrop-filter:blur(10px);">${Object.keys(colorSchemes).map(s => `<option value="${s}" ${settings.colorScheme === s ? 'selected' : ''}>${colorSchemes[s].name}</option>`).join('')}<option value="custom" ${settings.colorScheme === 'custom' ? 'selected' : ''}>Пользовательский цвет</option></select></div></div><div id="itd-custom-color-container" style="display:${settings.colorScheme === 'custom' ? 'block' : 'none'};margin-top:15px;padding:15px;background:rgba(34,25,36,0.5);border-radius:12px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-weight:500;font-size:14px;color:${colors.primary};">Свой цвет:</span><input type="color" id="itd-custom-color-picker" value="${settings.customColor || '#bc50d4'}" style="width:40px;height:40px;border-radius:8px;border:2px solid ${colors.secondary};cursor:pointer;"><input type="text" id="itd-custom-color-input" value="${settings.customColor || '#bc50d4'}" style="flex:1;background:rgba(255,255,255,0.05);color:white;border:1px solid ${colors.secondary};border-radius:8px;padding:8px 12px;font-family:'Consolas',monospace;font-size:13px;backdrop-filter:blur(5px);"></div><div style="font-size:12px;color:rgba(255,255,255,0.6);">HEX-код (например, #ff0000)</div></div><div style="margin-top:20px;padding:15px;background:rgba(34,25,36,0.5);border-radius:15px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="font-weight:600;color:${colors.primary};margin-bottom:12px;font-size:15px;text-shadow:0 0 5px rgba(${colors.primaryRgb},0.2);">🎨 Предпросмотр</div><div style="display:flex;gap:15px;flex-wrap:wrap;"><div style="display:flex;align-items:center;"><div style="background:${colors.primary};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.primary};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Основной</span></div><div style="display:flex;align-items:center;"><div style="background:${colors.secondary};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.secondary};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Вторичный</span></div><div style="display:flex;align-items:center;"><div style="background:${colors.accent};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.accent};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Акцент</span></div></div></div><div style="margin-top:15px;padding:15px;background:rgba(34,25,36,0.5);border-radius:15px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="display:flex;flex-direction:column;gap:8px;"><div style="font-weight:700;font-size:18px;color:${colors.primary};">ИТД+ v2.4.0</div><div style="font-size:14px;color:rgba(255,255,255,0.8);">Мини-плеер со списком треков, эмодзи</div><div style="margin-top:8px;font-size:13px;color:rgba(255,255,255,0.6);font-style:italic;">⚡ Кнопка списка треков в плеере</div><div style="margin-top:12px;font-size:13px;color:rgba(255,255,255,0.6);">2020-2026 <a href="https://t.me/vcb_code" target="_blank" style="color:${colors.primary};text-decoration:none;border-bottom:1px solid ${colors.primary};">VCB</a></div></div></div><div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;"><button id="itd-reset-colors" style="background:transparent;color:${colors.primary};border:1px solid ${colors.primary};padding:12px 22px;border-radius:25px;font-weight:600;cursor:pointer;font-size:14px;">Сброс</button><button id="itd-save-settings" style="background:linear-gradient(135deg,${colors.primary},${colors.accent});color:white;border:none;padding:12px 28px;border-radius:25px;font-weight:600;cursor:pointer;font-size:14px;box-shadow:0 4px 15px rgba(${colors.primaryRgb},0.3);">Сохранить</button></div></div>`;
+        modal.innerHTML = `<div class="modal-content"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:1px solid ${colors.secondary};padding-bottom:15px;"><h2 style="margin:0;color:${colors.primary};font-size:22px;text-shadow:0 0 10px rgba(${colors.primaryRgb},0.3);display:flex;align-items:center;">${gearIcon} Настройки ИТД+ </h2><button id="itd-modal-close" style="background:rgba(${colors.primaryRgb},0.1);border:1px solid ${colors.primary};color:${colors.primary};cursor:pointer;font-size:24px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;">✕</button></div><div class="setting-item"><div style="display:flex;align-items:center;justify-content:space-between;width:100%;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Включить стили</span><button id="itd-arrow-enabled" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.enabled ? '▲' : '▼'}</button></div><label class="toggle-switch"><input type="checkbox" id="itd-enabled" ${settings.enabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div id="itd-desc-enabled" class="setting-description" style="max-height:${expandedDescriptions.enabled ? '100px' : '0'};opacity:${expandedDescriptions.enabled ? '1' : '0'};"><div style="margin-top:10px;padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Если цвета не поменялись, нажмите F5 (Fn+5) для перезагрузки страницы.</div></div></div><div class="setting-item"><div style="display:flex;align-items:center;justify-content:space-between;width:100%;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Apple Emoji</span><button id="itd-arrow-emoji" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.emoji ? '▲' : '▼'}</button></div><label class="toggle-switch"><input type="checkbox" id="itd-emoji" ${settings.emojiEnabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div id="itd-desc-emoji" class="setting-description" style="max-height:${expandedDescriptions.emoji ? '100px' : '0'};opacity:${expandedDescriptions.emoji ? '1' : '0'};"><div style="margin-top:10px;padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Используются официальные эмодзи Apple. Могут быть некорректные отображения.</div></div></div><div class="setting-item"><div style="width:100%;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${expandedDescriptions.colors ? '10px' : '0'};"><div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:16px;color:${colors.primary};">Цветовая схема</span><button id="itd-arrow-colors" style="background:none;border:none;color:${colors.primary};cursor:pointer;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">${expandedDescriptions.colors ? '▲' : '▼'}</button></div></div><div id="itd-desc-colors" class="setting-description" style="max-height:${expandedDescriptions.colors ? '100px' : '0'};opacity:${expandedDescriptions.colors ? '1' : '0'};margin-bottom:10px;"><div style="padding:12px;background:rgba(${colors.secondaryRgb},0.1);border-radius:8px;border-left:3px solid ${colors.primary};font-size:13px;line-height:1.4;">Баг-репорты: @yetilov_robot</div></div><select id="itd-color-scheme" style="background:rgba(34,25,36,0.8);color:white;border:1px solid ${colors.secondary};border-radius:12px;padding:10px 14px;width:100%;font-size:14px;backdrop-filter:blur(10px);">${Object.keys(colorSchemes).map(s => `<option value="${s}" ${settings.colorScheme === s ? 'selected' : ''}>${colorSchemes[s].name}</option>`).join('')}<option value="custom" ${settings.colorScheme === 'custom' ? 'selected' : ''}>Пользовательский цвет</option></select></div></div><div id="itd-custom-color-container" style="display:${settings.colorScheme === 'custom' ? 'block' : 'none'};margin-top:15px;padding:15px;background:rgba(34,25,36,0.5);border-radius:12px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-weight:500;font-size:14px;color:${colors.primary};">Свой цвет:</span><input type="color" id="itd-custom-color-picker" value="${settings.customColor || '#bc50d4'}" style="width:40px;height:40px;border-radius:8px;border:2px solid ${colors.secondary};cursor:pointer;"><input type="text" id="itd-custom-color-input" value="${settings.customColor || '#bc50d4'}" style="flex:1;background:rgba(255,255,255,0.05);color:white;border:1px solid ${colors.secondary};border-radius:8px;padding:8px 12px;font-family:'Consolas',monospace;font-size:13px;backdrop-filter:blur(5px);"></div><div style="font-size:12px;color:rgba(255,255,255,0.6);">HEX-код (например, #ff0000)</div></div><div style="margin-top:20px;padding:15px;background:rgba(34,25,36,0.5);border-radius:15px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="font-weight:600;color:${colors.primary};margin-bottom:12px;font-size:15px;text-shadow:0 0 5px rgba(${colors.primaryRgb},0.2);">🎨 Предпросмотр</div><div style="display:flex;gap:15px;flex-wrap:wrap;"><div style="display:flex;align-items:center;"><div style="background:${colors.primary};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.primary};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Основной</span></div><div style="display:flex;align-items:center;"><div style="background:${colors.secondary};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.secondary};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Вторичный</span></div><div style="display:flex;align-items:center;"><div style="background:${colors.accent};width:24px;height:24px;border-radius:6px;margin-right:10px;box-shadow:0 0 8px ${colors.accent};"></div><span style="font-size:14px;color:rgba(255,255,255,0.9);">Акцент</span></div></div></div><div style="margin-top:15px;padding:15px;background:rgba(34,25,36,0.5);border-radius:15px;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);"><div style="display:flex;flex-direction:column;gap:8px;"><div style="font-weight:700;font-size:18px;color:${colors.primary};">ИТД+ v3.8.0</div><div style="font-size:14px;color:rgba(255,255,255,0.8);">Мини-плеер со списком треков, эмодзи</div><div style="margin-top:8px;font-size:13px;color:rgba(255,255,255,0.6);font-style:italic;">⚡ Кнопка списка треков в плеере</div><div style="margin-top:12px;font-size:13px;color:rgba(255,255,255,0.6);">2020-2026 <a href="https://t.me/vcb_code" target="_blank" style="color:${colors.primary};text-decoration:none;border-bottom:1px solid ${colors.primary};">VCB</a></div></div></div><div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;"><button id="itd-reset-colors" style="background:transparent;color:${colors.primary};border:1px solid ${colors.primary};padding:12px 22px;border-radius:25px;font-weight:600;cursor:pointer;font-size:14px;">Сброс</button><button id="itd-save-settings" style="background:linear-gradient(135deg,${colors.primary},${colors.accent});color:white;border:none;padding:12px 28px;border-radius:25px;font-weight:600;cursor:pointer;font-size:14px;box-shadow:0 4px 15px rgba(${colors.primaryRgb},0.3);">Сохранить</button></div></div>`;
         const modalStyles = `#itd-settings-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:999999;backdrop-filter:blur(8px);animation:itdFadeIn 0.2s ease;}#itd-settings-modal .modal-content{background:rgba(14,13,14,0.85);border:1px solid rgba(${colors.secondaryRgb},0.4);border-radius:28px;padding:36px;width:720px;height:720px;color:white;font-family:Inter,sans-serif;position:relative;overflow-y:auto;backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,0.5);animation:itdScaleIn 0.25s cubic-bezier(0.16,1,0.3,1);}#itd-settings-modal .setting-item{display:flex;flex-direction:column;align-items:flex-start;margin-bottom:16px;padding:16px;border-radius:16px;background:rgba(34,25,36,0.6);border:1px solid transparent;transition:all 0.15s ease;}#itd-settings-modal .setting-item:hover{background:rgba(50,24,50,0.7);border-color:rgba(${colors.primaryRgb},0.2);transform:translateY(-1px);}.setting-description{overflow:hidden;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);width:100%;}#itd-settings-modal .toggle-switch{position:relative;width:52px;height:26px;margin-left:10px;}#itd-settings-modal .toggle-switch input{opacity:0;width:0;height:0;}#itd-settings-modal .toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:rgba(255,255,255,0.1);border-radius:34px;transition:.2s;border:1px solid rgba(255,255,255,0.2);}#itd-settings-modal .toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:2px;bottom:2px;background-color:white;border-radius:50%;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,0.2);}#itd-settings-modal input:checked+.toggle-slider{background-color:${colors.primary};box-shadow:0 0 10px ${colors.primary};}#itd-settings-modal input:checked+.toggle-slider:before{transform:translateX(26px);}#itd-settings-modal::-webkit-scrollbar{width:6px;}#itd-settings-modal::-webkit-scrollbar-track{background:rgba(0,0,0,0.1);border-radius:4px;}#itd-settings-modal::-webkit-scrollbar-thumb{background:${colors.primary};border-radius:4px;}@keyframes itdFadeIn{from{opacity:0;}to{opacity:1;}}@keyframes itdScaleIn{from{transform:scale(0.96);opacity:0;}to{transform:scale(1);opacity:1;}}`;
         addStyleTag('itd-modal-styles', modalStyles);
         document.body.appendChild(modal);
@@ -412,10 +586,12 @@
         });
     }
 
-    // ================== МИНИ-ПЛЕЕР (С КНОПКОЙ СПИСКА) ==================
-    function createMiniPlayer() {
-        if (miniPlayer) return;
 
+    // ================== МИНИ-ПЛЕЕР (С КНОПКОЙ СПИСКА) ==================
+
+
+     function createMiniPlayer() {
+        if (miniPlayer) return;
         const colors = getCurrentColorScheme();
         miniPlayer = document.createElement('div');
         miniPlayer.id = 'itd-mini-player';
@@ -438,49 +614,105 @@
             display: none;
             flex-direction: column;
             gap: 10px;
-            transition: opacity 0.2s;
+            transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
         `;
+
         miniPlayer.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 16px;">
-                <img id="itd-mini-cover" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 24 24' fill='%23333'%3E%3Cpath d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/%3E%3C/svg%3E" style="width:56px; height:56px; border-radius:12px; object-fit:cover;">
+
+        <!-- ЗАГОЛОВОК С КНОПКОЙ СВОРАЧИВАНИЯ -->
+            <div id="itd-mini-main-row" style="display: flex; align-items: center; gap: 16px;">
+                <img id="itd-mini-cover"
+                    src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 24 24' fill='%23333'%3E%3Cpath d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/%3E%3C/svg%3E"
+                    style="width:56px; height:56px; border-radius:12px; object-fit:cover; flex-shrink:0; transition: all 0.3s ease;">
                 <div style="flex:1; min-width:0;">
                     <div id="itd-mini-title" style="font-weight:600; font-size:1.1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Без названия</div>
                     <div id="itd-mini-artist" style="font-size:0.9rem; color:#bdbdbd; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Неизвестный исполнитель</div>
                 </div>
-                <div style="display:flex; gap:12px;">
-                    <button id="itd-mini-show-list" style="background:none; border:none; color:${colors.primary}; cursor:pointer;" title="Показать список треков"><span class="material-icons">queue_music</span></button>
-                    <button id="itd-mini-shuffle" style="background:none; border:none; color:${shuffle ? colors.primary : '#bdbdbd'}; cursor:pointer;"><span class="material-icons">shuffle</span></button>
-                    <button id="itd-mini-prev" style="background:none; border:none; color:white; cursor:pointer;"><span class="material-icons">skip_previous</span></button>
-                    <button id="itd-mini-playpause" style="background:#ffffff1a; border:1px solid rgba(255,255,255,0.1); color:#fff; width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer;"><span id="itd-mini-icon" class="material-icons">play_arrow</span></button>
-                    <button id="itd-mini-next" style="background:none; border:none; color:white; cursor:pointer;"><span class="material-icons">skip_next</span></button>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <!-- Кнопка списка -->
+                    <button id="itd-mini-show-list" style="background:none; border:none; color:${colors.primary}; cursor:pointer; padding:4px;" title="Показать список треков">
+                        <span class="material-icons" style="font-size:22px;">queue_music</span>
+                    </button>
+                    <!-- Кнопка shuffle -->
+                    <button id="itd-mini-shuffle" style="background:none; border:none; color:${shuffle ? colors.primary : '#bdbdbd'}; cursor:pointer; padding:4px;" title="Перемешать">
+                        <span class="material-icons" style="font-size:22px;">shuffle</span>
+                    </button>
+                    <button id="itd-mini-prev" style="background:none; border:none; color:white; cursor:pointer; padding:4px;">
+                        <span class="material-icons" style="font-size:22px;">skip_previous</span>
+                    </button>
+                    <button id="itd-mini-playpause" style="background:#ffffff1a; border:1px solid rgba(255,255,255,0.1); color:#fff; width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+                        <span id="itd-mini-icon" class="material-icons">play_arrow</span>
+                    </button>
+                    <button id="itd-mini-next" style="background:none; border:none; color:white; cursor:pointer; padding:4px;">
+                        <span class="material-icons" style="font-size:22px;">skip_next</span>
+                    </button>
+                    <!-- ★ КНОПКА СВОРАЧИВАНИЯ / РАЗВОРАЧИВАНИЯ ★ -->
+                    <button id="itd-mini-collapse" style="background:none; border:none; color:#bdbdbd; cursor:pointer; padding:4px; transition: transform 0.3s ease;" title="Свернуть / развернуть">
+                        <span class="material-icons" style="font-size:20px;">expand_more</span>
+                    </button>
                 </div>
             </div>
-            <div style="display:flex; align-items:center; gap:12px;">
-                <span id="itd-mini-current" style="font-size:0.85rem; color:#bdbdbd; min-width:40px;">0:00</span>
-                <input type="range" id="itd-mini-progress" min="0" max="100" value="0" step="0.1" style="flex:1; height:5px; -webkit-appearance:none; background:rgba(255,255,255,0.2); border-radius:5px;">
-                <span id="itd-mini-duration" style="font-size:0.85rem; color:#bdbdbd; min-width:40px;">0:00</span>
-                <button id="itd-mini-mute" style="background:none; border:none; color:#bdbdbd; cursor:pointer;"><span id="itd-mini-muteicon" class="material-icons">volume_up</span></button>
-                <input type="range" id="itd-mini-volume" min="0" max="1" step="0.01" value="0.8" style="width:80px; height:5px; -webkit-appearance:none; background:rgba(255,255,255,0.2); border-radius:5px;">
+
+            <!-- ПРОГРЕСС + ГРОМКОСТЬ (скрываются при сворачивании) -->
+            <div id="itd-mini-bottom-row" style="display:flex; align-items:center; gap:12px; overflow:hidden; transition: all 0.3s ease; max-height: 40px; opacity: 1;">
+                <span id="itd-mini-current" style="font-size:0.85rem; color:#bdbdbd; min-width:36px;">0:00</span>
+                <input type="range" id="itd-mini-progress" min="0" max="100" value="0" step="0.1"
+                    style="flex:1; height:5px; -webkit-appearance:none; background:rgba(255,255,255,0.2); border-radius:5px; cursor:pointer;">
+                <span id="itd-mini-duration" style="font-size:0.85rem; color:#bdbdbd; min-width:36px;">0:00</span>
+                <button id="itd-mini-mute" style="background:none; border:none; color:#bdbdbd; cursor:pointer; padding:4px;">
+                    <span id="itd-mini-muteicon" class="material-icons" style="font-size:20px;">volume_up</span>
+                </button>
+                <input type="range" id="itd-mini-volume" min="0" max="1" step="0.01" value="0.8"
+                    style="width:70px; height:5px; -webkit-appearance:none; background:rgba(255,255,255,0.2); border-radius:5px; cursor:pointer;">
             </div>
         `;
+
         document.body.appendChild(miniPlayer);
 
-        const miniShowList = miniPlayer.querySelector('#itd-mini-show-list');
-        const miniShuffle = miniPlayer.querySelector('#itd-mini-shuffle');
-        const miniPrev = miniPlayer.querySelector('#itd-mini-prev');
+      // Привязываем элементы
+ const miniShowList  = miniPlayer.querySelector('#itd-mini-show-list');
+        const miniShuffle   = miniPlayer.querySelector('#itd-mini-shuffle');
+        const miniPrev      = miniPlayer.querySelector('#itd-mini-prev');
         const miniPlayPause = miniPlayer.querySelector('#itd-mini-playpause');
-        const miniNext = miniPlayer.querySelector('#itd-mini-next');
-        const miniProgress = miniPlayer.querySelector('#itd-mini-progress');
-        const miniVolume = miniPlayer.querySelector('#itd-mini-volume');
-        const miniMute = miniPlayer.querySelector('#itd-mini-mute');
-        const miniIcon = miniPlayer.querySelector('#itd-mini-icon');
-        const miniMuteIcon = miniPlayer.querySelector('#itd-mini-muteicon');
-        const miniCurrent = miniPlayer.querySelector('#itd-mini-current');
-        const miniDuration = miniPlayer.querySelector('#itd-mini-duration');
-        const miniCover = miniPlayer.querySelector('#itd-mini-cover');
-        const miniTitle = miniPlayer.querySelector('#itd-mini-title');
-        const miniArtist = miniPlayer.querySelector('#itd-mini-artist');
-
+        const miniNext      = miniPlayer.querySelector('#itd-mini-next');
+        const miniProgress  = miniPlayer.querySelector('#itd-mini-progress');
+        const miniVolume    = miniPlayer.querySelector('#itd-mini-volume');
+        const miniMute      = miniPlayer.querySelector('#itd-mini-mute');
+        const miniIcon      = miniPlayer.querySelector('#itd-mini-icon');
+        const miniMuteIcon  = miniPlayer.querySelector('#itd-mini-muteicon');
+        const miniCurrent   = miniPlayer.querySelector('#itd-mini-current');
+        const miniDuration  = miniPlayer.querySelector('#itd-mini-duration');
+        const miniCover     = miniPlayer.querySelector('#itd-mini-cover');
+        const miniTitle     = miniPlayer.querySelector('#itd-mini-title');
+        const miniArtist    = miniPlayer.querySelector('#itd-mini-artist');
+        const miniCollapse  = miniPlayer.querySelector('#itd-mini-collapse');
+        const miniBottomRow = miniPlayer.querySelector('#itd-mini-bottom-row');
+        const miniMainRow   = miniPlayer.querySelector('#itd-mini-main-row');
+        // ★ ЛОГИКА СВОРАЧИВАНИЯ / РАЗВОРАЧИВАНИЯ ★
+        miniCollapse.addEventListener('click', () => {
+            miniPlayerCollapsed = !miniPlayerCollapsed;
+            if (miniPlayerCollapsed) {
+                // Свернуть: скрываем нижнюю строку и обложку
+                miniBottomRow.style.maxHeight = '0';
+                miniBottomRow.style.opacity   = '0';
+                miniBottomRow.style.marginTop = '-10px';
+                miniCover.style.width  = '36px';
+                miniCover.style.height = '36px';
+                miniPlayer.style.padding = '10px 20px';
+                miniCollapse.querySelector('.material-icons').textContent = 'expand_less';
+                miniCollapse.title = 'Развернуть';
+            } else {
+                // Развернуть
+                miniBottomRow.style.maxHeight = '40px';
+                miniBottomRow.style.opacity   = '1';
+                miniBottomRow.style.marginTop = '0';
+                miniCover.style.width  = '56px';
+                miniCover.style.height = '56px';
+                miniPlayer.style.padding = '16px 24px';
+                miniCollapse.querySelector('.material-icons').textContent = 'expand_more';
+                miniCollapse.title = 'Свернуть';
+            }
+        });
         // Кнопка показа списка треков
         miniShowList.addEventListener('click', () => {
             if (trackListPopup) {
@@ -522,6 +754,53 @@
             }
             loadTrack(newIndex);
         });
+// ★ АВТОВОСПРОИЗВЕДЕНИЕ СЛЕДУЮЩЕГО ТРЕКА ★
+        function onTrackEnded() {
+            const nextIdx = getNextIndex();
+            if (nextIdx !== -1) {
+                playTrackByIndex(nextIdx);
+            } else {
+                // Список закончился
+                miniIcon.textContent = 'play_arrow';
+                miniProgress.value = 0;
+                miniCurrent.textContent = '0:00';
+                showNotification('Воспроизведение завершено 🎵');
+            }
+        }
+
+        // Функция воспроизведения по индексу
+        function playTrackByIndex(index) {
+            if (index < 0 || index >= trackList.length) return;
+            currentTrackIndex = index;
+            const track = trackList[index];
+
+            if (currentAudio) {
+                currentAudio.removeEventListener('timeupdate', onTimeUpdate);
+                currentAudio.removeEventListener('loadedmetadata', onLoadedMetadata);
+                currentAudio.removeEventListener('ended', onTrackEnded);
+                currentAudio.pause();
+            }
+
+            currentAudio = new Audio(track.url);
+            currentAudio.volume = parseFloat(miniVolume.value) || 0.8;
+            currentAudio.addEventListener('timeupdate', onTimeUpdate);
+            currentAudio.addEventListener('loadedmetadata', onLoadedMetadata);
+            currentAudio.addEventListener('ended', onTrackEnded); // ★ автовоспроизведение
+
+            miniTitle.textContent  = track.title  || 'Без названия';
+            miniArtist.textContent = track.artist || 'Неизвестный исполнитель';
+            miniCover.src = track.cover || miniCover.dataset.default;
+            miniIcon.textContent = 'pause';
+
+            currentAudio.play().catch(e => {
+                console.warn('ITD+ Player: не удалось воспроизвести трек', e);
+                miniIcon.textContent = 'play_arrow';
+            });
+
+            showMiniPlayer();
+        }
+
+
 
         // Next
         miniNext.addEventListener('click', () => {
@@ -615,6 +894,67 @@
     }
 
     // ================== ВСПЛЫВАЮЩИЙ СПИСОК ТРЕКОВ ==================
+function showTrackListModal() {
+        const existing = document.getElementById('itd-tracklist-modal');
+        if (existing) { existing.remove(); return; }
+
+        const colors = getCurrentColorScheme();
+        const modal = document.createElement('div');
+        modal.id = 'itd-tracklist-modal';
+        modal.style.cssText = `
+            position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+            width: 580px; max-width: 90vw; max-height: 60vh;
+            background: rgba(14,13,14,0.96); border: 1px solid ${colors.secondary};
+            border-radius: 24px; overflow-y: auto; z-index: 9999;
+            backdrop-filter: blur(20px); box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            font-family: Inter, sans-serif; color: white;
+            padding: 12px 0; animation: itdFadeIn 0.15s ease;
+        `;
+
+        if (!trackList.length) {
+            modal.innerHTML = `<div style="padding:20px; text-align:center; color:#bdbdbd;">Список треков пуст</div>`;
+        } else {
+            trackList.forEach((track, i) => {
+                const item = document.createElement('div');
+                item.style.cssText = `
+                    display:flex; align-items:center; gap:12px; padding:10px 16px;
+                    cursor:pointer; border-radius:12px; margin:2px 8px;
+                    transition: background 0.15s;
+                    background: ${i === currentTrackIndex ? `rgba(${colors.primaryRgb},0.15)` : 'transparent'};
+                    border-left: 3px solid ${i === currentTrackIndex ? colors.primary : 'transparent'};
+                `;
+                item.innerHTML = `
+                    <span class="material-icons" style="color:${i === currentTrackIndex ? colors.primary : '#555'}; font-size:18px;">
+                        ${i === currentTrackIndex && currentAudio && !currentAudio.paused ? 'equalizer' : 'music_note'}
+                    </span>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-weight:${i === currentTrackIndex ? '600' : '400'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:${i === currentTrackIndex ? colors.primary : 'white'};">${track.title || 'Без названия'}</div>
+                        <div style="font-size:0.8rem; color:#888; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${track.artist || 'Неизвестный'}</div>
+                    </div>
+                `;
+                item.addEventListener('mouseenter', () => {
+                    if (i !== currentTrackIndex) item.style.background = 'rgba(255,255,255,0.05)';
+                });
+                item.addEventListener('mouseleave', () => {
+                    if (i !== currentTrackIndex) item.style.background = 'transparent';
+                });
+                item.addEventListener('click', () => {
+                    if (window.itdPlayTrack) window.itdPlayTrack(i);
+                    modal.remove();
+                });
+                modal.appendChild(item);
+            });
+        }
+        // Закрытие при клике вне
+        setTimeout(() => {
+            document.addEventListener('click', function closeModal(e) {
+                if (!modal.contains(e.target) && e.target.id !== 'itd-mini-show-list') {
+                    modal.remove();
+                    document.removeEventListener('click', closeModal);
+                }
+            });
+        }, 100);
+    }
     function openTrackListPopup() {
         if (trackListPopup) {
             trackListPopup.style.display = 'block';
@@ -730,6 +1070,38 @@
         });
     }
 
+
+        // Функция воспроизведения по индексу
+        function playTrackByIndex(index) {
+            if (index < 0 || index >= trackList.length) return;
+            currentTrackIndex = index;
+            const track = trackList[index];
+
+            if (currentAudio) {
+                currentAudio.removeEventListener('timeupdate', onTimeUpdate);
+                currentAudio.removeEventListener('loadedmetadata', onLoadedMetadata);
+                currentAudio.removeEventListener('ended', onTrackEnded);
+                currentAudio.pause();
+            }
+
+            currentAudio = new Audio(track.url);
+            currentAudio.volume = parseFloat(miniVolume.value) || 0.8;
+            currentAudio.addEventListener('timeupdate', onTimeUpdate);
+            currentAudio.addEventListener('loadedmetadata', onLoadedMetadata);
+            currentAudio.addEventListener('ended', onTrackEnded); // ★ автовоспроизведение
+
+            miniTitle.textContent  = track.title  || 'Без названия';
+            miniArtist.textContent = track.artist || 'Неизвестный исполнитель';
+            miniCover.src = track.cover || miniCover.dataset.default;
+            miniIcon.textContent = 'pause';
+
+            currentAudio.play().catch(e => {
+                console.warn('ITD+ Player: не удалось воспроизвести трек', e);
+                miniIcon.textContent = 'play_arrow';
+            });
+
+            showMiniPlayer();
+        }
     // ================== МОДАЛЬНОЕ ОКНО МЕДИАТЕКИ (ДЛЯ ПОЛНОЙ БИБЛИОТЕКИ) ==================
     function openMusicModal() {
         if (musicModal) {
@@ -1154,27 +1526,20 @@
     }
 
     // ================== ЭМОДЗИ-СИСТЕМА (ПОЛНАЯ) ==================
-    function initEmojiSystem() {
+  function initEmojiSystem() {
         if (!settings.emojiEnabled) return removeEmojiSystem();
         removeEmojiSystem();
-
         const emojiStyle = document.createElement('style');
         emojiStyle.id = 'apple-emoji-styles';
-        emojiStyle.textContent = `
-            .apple-emoji{font-size:inherit!important;line-height:inherit!important;vertical-align:text-bottom!important;display:inline-block!important;}
-            .apple-emoji-container{display:inline-block;line-height:inherit;}
-            .apple-emoji{position:relative;top:0.1em;}
-        `;
+        emojiStyle.textContent = `.apple-emoji{font-size:inherit!important;line-height:inherit!important;vertical-align:text-bottom!important;display:inline-block!important;}.apple-emoji-container{display:inline-block;line-height:inherit;}.apple-emoji{position:relative;top:0.1em;}`;
         document.head.appendChild(emojiStyle);
         const emojiConfig = {
             emojiSource: 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.1.2/img/apple/64',
             imageFormat: 'png',
-            excludeSelectors: ['script', 'style', 'textarea', 'input', 'code', 'pre', '.no-emoji', '[data-no-emoji]', '[contenteditable="true"]']
+            excludeSelectors: ['script','style','textarea','input','code','pre','.no-emoji','[data-no-emoji]','[contenteditable="true"]']
         };
         const emojiCache = new Map();
-        function normalizeEmojiCode(code) {
-            return code.replace(/-fe0f/g, '').replace(/fe0f-?/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
-        }
+        function normalizeEmojiCode(code) { return code.replace(/-fe0f/g,'').replace(/fe0f-?/g,'').replace(/-+/g,'-').replace(/^-|-$/g,''); }
         function getEmojiCode(emojiChar) {
             try {
                 if (/^\d$/.test(emojiChar)) return null;
@@ -1185,57 +1550,29 @@
                     const codePoint = emojiChar.codePointAt(i);
                     if (!codePoint) continue;
                     let charCode = codePoint.toString(16).toLowerCase();
-                    if (charCode) {
-                        fullCode += (fullCode ? '-' : '') + charCode;
-                        if (codePoint > 0xFFFF) i++;
-                    }
+                    if (charCode) { fullCode += (fullCode ? '-' : '') + charCode; if (codePoint > 0xFFFF) i++; }
                 }
                 return normalizeEmojiCode(fullCode);
-            } catch {
-                return null;
-            }
-        }
-        function getAppleEmojiUrl(emojiCode) {
-            if (!emojiCode) return null;
-            return `${emojiConfig.emojiSource}/${emojiCode}.${emojiConfig.imageFormat}`;
+            } catch { return null; }
         }
         function shouldProcessEmojiElement(element) {
             if (!element || !element.textContent) return false;
-            for (const sel of emojiConfig.excludeSelectors) {
-                if (element.closest(sel)) return false;
-            }
-            const text = element.textContent;
-            if (/^[\d#@$%^&*()_+\-=\[\]{}|;:,.<>?\/\\`~]+$/.test(text.trim())) return false;
-            const emojiRegex = /([\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}])(?:\u200D[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}])*|[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu;
-            return emojiRegex.test(text);
+            for (const sel of emojiConfig.excludeSelectors) { if (element.closest(sel)) return false; }
+            const emojiRegex = /[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu;
+            return emojiRegex.test(element.textContent);
         }
         function createEmojiElement(emojiChar) {
             const emojiCode = getEmojiCode(emojiChar);
             if (!emojiCode) return document.createTextNode(emojiChar);
-            if (emojiCache.has(emojiChar)) {
-                return emojiCache.get(emojiChar).cloneNode(true);
-            }
-            const emojiUrl = getAppleEmojiUrl(emojiCode);
-            if (!emojiUrl) return document.createTextNode(emojiChar);
+            if (emojiCache.has(emojiChar)) return emojiCache.get(emojiChar).cloneNode(true);
             const container = document.createElement('span');
             container.className = 'apple-emoji-container';
             container.setAttribute('data-emoji', emojiChar);
-            container.setAttribute('data-emoji-code', emojiCode);
             const img = document.createElement('img');
-            img.src = emojiUrl;
-            img.alt = emojiChar;
-            img.className = 'apple-emoji';
-            img.loading = 'lazy';
-            img.decoding = 'async';
-            img.style.cssText = 'display:inline-block;vertical-align:text-bottom;font-size:inherit;line-height:inherit;height:1.2em;width:auto;max-width:1.2em;min-width:1em;object-fit:contain;margin:0 0.05em;';
-            img.onerror = () => {
-                const fallbackUrl = `${emojiConfig.emojiSource}/${emojiCode.replace(/-/g, '')}.${emojiConfig.imageFormat}`;
-                if (img.src !== fallbackUrl) {
-                    img.src = fallbackUrl;
-                } else {
-                    img.replaceWith(document.createTextNode(emojiChar));
-                }
-            };
+            img.src = `${emojiConfig.emojiSource}/${emojiCode}.${emojiConfig.imageFormat}`;
+            img.alt = emojiChar; img.className = 'apple-emoji'; img.loading = 'lazy';
+            img.style.cssText = 'display:inline-block;vertical-align:text-bottom;height:1.2em;width:auto;max-width:1.2em;min-width:1em;object-fit:contain;margin:0 0.05em;';
+            img.onerror = () => { img.replaceWith(document.createTextNode(emojiChar)); };
             container.appendChild(img);
             emojiCache.set(emojiChar, container.cloneNode(true));
             return container;
@@ -1245,58 +1582,37 @@
             const text = textNode.textContent;
             const emojiRegex = /([\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}])(?:\u200D[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}])*|[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu;
             const matches = [...text.matchAll(emojiRegex)];
-            if (matches.length === 0) return false;
+            if (!matches.length) return false;
             const fragment = document.createDocumentFragment();
             let lastIndex = 0;
             for (const match of matches) {
-                const emoji = match[0];
-                const index = match.index;
-                if (index > lastIndex) {
-                    fragment.appendChild(document.createTextNode(text.substring(lastIndex, index)));
-                }
-                fragment.appendChild(createEmojiElement(emoji));
-                lastIndex = index + emoji.length;
+                if (match.index > lastIndex) fragment.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
+                fragment.appendChild(createEmojiElement(match[0]));
+                lastIndex = match.index + match[0].length;
             }
-            if (lastIndex < text.length) {
-                fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
-            }
-            try {
-                textNode.parentNode.replaceChild(fragment, textNode);
-                return true;
-            } catch {
-                return false;
-            }
+            if (lastIndex < text.length) fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+            try { textNode.parentNode.replaceChild(fragment, textNode); return true; } catch { return false; }
         }
-        processEmojiDOM = function processEmojiDOM(rootElement = document.body) {
-            if (!rootElement) return 0;
-            let count = 0;
+        processEmojiDOM = function(rootElement = document.body) {
+            if (!rootElement) return;
             const walker = document.createTreeWalker(rootElement, NodeFilter.SHOW_TEXT, {
                 acceptNode: node => shouldProcessEmojiElement(node.parentElement) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
             });
             const nodes = [];
             let node;
             while (node = walker.nextNode()) nodes.push(node);
-            for (let i = nodes.length - 1; i >= 0; i--) {
-                if (processEmojiTextNode(nodes[i])) count++;
-            }
-            return count;
+            for (let i = nodes.length - 1; i >= 0; i--) processEmojiTextNode(nodes[i]);
         };
         let timeoutId = null;
         if (emojiObserver) emojiObserver.disconnect();
-        emojiObserver = new MutationObserver(() => {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => processEmojiDOM(), 100);
-        });
+        emojiObserver = new MutationObserver(() => { clearTimeout(timeoutId); timeoutId = setTimeout(() => processEmojiDOM(), 100); });
         emojiObserver.observe(document.body, { childList: true, subtree: true });
         setTimeout(() => processEmojiDOM(), 500);
     }
 
     function removeEmojiSystem() {
         document.getElementById('apple-emoji-styles')?.remove();
-        if (emojiObserver) {
-            emojiObserver.disconnect();
-            emojiObserver = null;
-        }
+        if (emojiObserver) { emojiObserver.disconnect(); emojiObserver = null; }
         document.querySelectorAll('.apple-emoji-container').forEach(c => {
             const emoji = c.getAttribute('data-emoji');
             if (emoji) c.replaceWith(document.createTextNode(emoji));
@@ -1304,20 +1620,6 @@
         processEmojiDOM = null;
     }
 
-    // ================== ОТСЛЕЖИВАНИЕ КОММЕНТАРИЕВ ==================
-    function initCommentsObserver() {
-        commentsObserver = new MutationObserver(() => {
-            const commentsSection = document.querySelector('.comments, .comment-input-form, .post-modal__comments');
-            if (commentsSection && commentsSection.offsetParent !== null) {
-                if (miniPlayer) miniPlayer.style.display = 'none';
-            } else {
-                if (currentTrackIndex >= 0 && tracks[currentTrackIndex]) {
-                    if (miniPlayer) miniPlayer.style.display = 'flex';
-                }
-            }
-        });
-        commentsObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
-    }
 
     // ================== УВЕДОМЛЕНИЯ ==================
     function showNotification(text, isError = false) {
@@ -1325,14 +1627,17 @@
         const colors = getCurrentColorScheme();
         const notification = document.createElement('div');
         notification.className = 'itd-notification';
-        notification.style.cssText = `position:fixed;top:20px;left:50%;transform:translateX(-50%);background:${isError ? 'rgba(220,53,69,0.9)' : `rgba(${colors.primaryRgb},0.9)`};color:white;padding:12px 24px;border-radius:40px;font-family:Inter,sans-serif;font-weight:500;z-index:1000000;border:1px solid ${colors.secondary};backdrop-filter:blur(10px);text-align:center;white-space:nowrap;max-width:90%;font-size:14px;display:flex;align-items:center;gap:8px;`;
+        notification.style.cssText = `position:fixed;top:20px;left:50%;transform:translateX(-50%);background:${isError ? 'rgba(220,53,69,0.9)' : `rgba(${colors.primaryRgb},0.9)`};color:white;padding:12px 24px;border-radius:40px;font-family:Inter,sans-serif;font-weight:500;z-index:1000000;box-shadow:0 10px 25px rgba(0,0,0,0.3);border:1px solid ${colors.secondary};backdrop-filter:blur(10px);text-align:center;white-space:nowrap;max-width:90%;font-size:14px;display:flex;align-items:center;gap:8px;`;
         const icon = document.createElement('span');
         icon.innerHTML = isError ? '❌' : '✅';
-        icon.style.fontSize = '16px';
         notification.prepend(icon);
         notification.appendChild(document.createTextNode(text));
         document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), CONFIG.NOTIFICATION_DURATION);
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.15s';
+            setTimeout(() => notification.remove(), 150);
+        }, CONFIG.NOTIFICATION_DURATION);
     }
 
     // ================== ПЕРИОДИЧЕСКАЯ ПРОВЕРКА ==================
