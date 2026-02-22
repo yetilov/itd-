@@ -1,0 +1,16 @@
+// ==UserScript==
+// @name         itd#v21_03_25_bt_fd
+// @namespace    http://tampermonkey.net/
+// @version      v1.0
+// @description  
+// @author       ITD: @VCB / TG: @VCB_CODE (мод.)
+// @match        
+// @icon         
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_registerMenuCommand
+// @run-at       document-idle
+// @require      https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js
+// @updateURL    https://github.com/yetilov/itd-/raw/refs/heads/main/
+// @downloadURL  https://github.com/yetilov/itd-/raw/refs/heads/main/
+// ==/UserScript==
